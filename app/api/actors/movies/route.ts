@@ -13,7 +13,7 @@ export async function GET(request: NextRequest) {
     const connection = await mysql.createConnection({
       host: 'localhost',
       user: 'root',
-      password: 'root',
+      password: 'process.env.DB_PASSWORD',
       database: 'imdb_project',
     });
 

@@ -10,14 +10,15 @@ export async function GET(request: NextRequest) {
     const type = searchParams.get('type') || 'all';
     const genre = searchParams.get('genre') || 'all';
     const talentId = searchParams.get('talentId') || 'all';
-    const maxBudget = parseInt(searchParams.get('maxBudget') || '250', 10) * 1000000;
+    const minBudget = parseInt(searchParams.get('minBudget') || '0', 10) * 1000000;
+    const maxBudget = parseInt(searchParams.get('maxBudget') || '1000', 10) * 1000000;
     const startYear = parseInt(searchParams.get('startYear') || '1970', 10);
     const endYear = parseInt(searchParams.get('endYear') || '2026', 10);
 
     const connection = await mysql.createConnection({
       host: 'localhost',
       user: 'root',
-      password: 'root', // Zet op '' als je lokaal geen wachtwoord hebt
+      password: 'process.env.DB_PASSWORD', // Zet op '' als je lokaal geen wachtwoord hebt
       database: 'imdb_project',
     });
 
@@ -39,12 +40,12 @@ export async function GET(request: NextRequest) {
       JOIN title_financials f ON t.title_id = f.title_id AND f.budget >= ${MIN_BUDGET}
       LEFT JOIN title_rating tr ON t.title_id = tr.title_id
       WHERE t.start_year >= ? AND t.start_year <= ?
-        AND f.budget <= ?
+        AND f.budget >= ? AND f.budget <= ?
         AND t.runtime_minutes IS NOT NULL
     `;
     
     // Arrays met parameters voor de '?' plekken
-    const params: any[] = [startYear, endYear, maxBudget];
+    const params: any[] = [startYear, endYear, minBudget, maxBudget];
 
     // 3. Voeg Type filter toe indien geselecteerd
     if (type !== 'all') {

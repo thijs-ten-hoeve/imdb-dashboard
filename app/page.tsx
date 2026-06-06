@@ -123,6 +123,28 @@ interface GenreInfo {
   avgMarginPct: number
 }
 
+function formatBudget(value: number): string {
+  if (value >= 1_000_000) {
+    const m = value / 1_000_000
+    return (m % 1 === 0 ? m.toString() : m.toFixed(1)) + 'M'
+  }
+  const k = value / 1_000
+  return (k % 1 === 0 ? k.toString() : k.toFixed(1)) + 'K'
+}
+
+function parseBudget(input: string): number {
+  const s = input.trim().toUpperCase().replace(/\s/g, '')
+  if (s.endsWith('M')) {
+    const n = parseFloat(s.slice(0, -1).replace(',', '.'))
+    return isNaN(n) ? 0 : Math.round(n * 1_000_000)
+  }
+  if (s.endsWith('K')) {
+    const n = parseFloat(s.slice(0, -1).replace(',', '.'))
+    return isNaN(n) ? 0 : Math.round(n * 1_000)
+  }
+  return parseInt(s.replace(/\./g, '').replace(',', '.')) || 0
+}
+
 export default function CanaryDashboard() {
   // Data State
   const [masterCatalog, setMasterCatalog] = React.useState<MovieData[]>([])
@@ -139,12 +161,17 @@ export default function CanaryDashboard() {
   // Filter State
   const [productionType, setProductionType] = React.useState<string>("all")
   const [selectedGenre, setSelectedGenre] = React.useState<string | null>(null)
-  const [maxBudget, setMaxBudget] = React.useState<number>(180)
+  const [budgetRange, setBudgetRange] = React.useState<[number, number]>([10_000, 1_000_000_000])
+  const [budgetCeiling, setBudgetCeiling] = React.useState<number>(1_000_000_000)
+  const [budgetInputMin, setBudgetInputMin] = React.useState<string>(formatBudget(10_000))
+  const [budgetInputMax, setBudgetInputMax] = React.useState<string>(formatBudget(1_000_000_000))
+  const prevCatalogKey = React.useRef<string>('')
   const [yearRange, setYearRange] = React.useState<number[]>([1970, 2026])
   const [actorSearchQuery, setActorSearchQuery] = React.useState<string>("")
   const [filmSearchQuery, setFilmSearchQuery] = React.useState<string>("")
   const [sortField, setSortField] = React.useState<SortField>("winst")
   const [sortDirection, setSortDirection] = React.useState<SortDirection>("desc")
+  const [filmPageSize, setFilmPageSize] = React.useState<number>(10)
   
   // UI State
   const [chosenCast, setChosenCast] = React.useState<ActorInfo[]>([])
@@ -235,7 +262,8 @@ export default function CanaryDashboard() {
         const url = new URL('/api/catalog', window.location.origin);
         url.searchParams.append('type', productionType);
         url.searchParams.append('genre', selectedGenre || 'all');
-        url.searchParams.append('maxBudget', maxBudget.toString());
+        url.searchParams.append('minBudget', Math.round(budgetRange[0] / 1_000_000).toString());
+        url.searchParams.append('maxBudget', Math.round(budgetRange[1] / 1_000_000).toString());
         url.searchParams.append('startYear', yearRange[0].toString());
         url.searchParams.append('endYear', yearRange[1].toString());
         if (selectedActorFilter) {
@@ -252,6 +280,19 @@ export default function CanaryDashboard() {
         }));
         setMasterCatalog(cleanMovies);
 
+        const catalogKey = `${selectedGenre ?? 'all'}-${yearRange[0]}-${yearRange[1]}`;
+        if (prevCatalogKey.current !== catalogKey) {
+          prevCatalogKey.current = catalogKey;
+          const top = [...cleanMovies].sort((a: any, b: any) =>
+            (b.baseMarginFactor * b.budget) - (a.baseMarginFactor * a.budget)
+          )[0];
+          if (top?.budget > 0) {
+            setBudgetCeiling(top.budget);
+            setBudgetRange(prev => [prev[0], top.budget]);
+            setBudgetInputMax(formatBudget(top.budget));
+          }
+        }
+
       } catch (error) {
         console.error("Fout bij ophalen catalogus:", error);
       } finally {
@@ -260,7 +301,7 @@ export default function CanaryDashboard() {
     }, 400); 
 
     return () => clearTimeout(delayDebounceFn);
-  }, [productionType, selectedGenre, maxBudget, yearRange, selectedActorFilter]);
+  }, [productionType, selectedGenre, budgetRange, yearRange, selectedActorFilter]);
 
   React.useEffect(() => {
     function handleOutsideClick(event: MouseEvent) {
@@ -273,6 +314,9 @@ export default function CanaryDashboard() {
   }, [popupContent])
 
   const handleGenreChange = (genre: string | null) => {
+    setBudgetRange(prev => [prev[0], 1_000_000_000])
+    setBudgetCeiling(1_000_000_000)
+    setBudgetInputMax(formatBudget(1_000_000_000))
     setSelectedGenre(genre)
     setActorSearchQuery("")
     setPopupContent(null)
@@ -369,6 +413,11 @@ export default function CanaryDashboard() {
       return dir * (a.nettoWinst - b.nettoWinst)
     })
   }, [processedAnalytics.rankedMovies, filmSearchQuery, sortField, sortDirection])
+
+  const paginatedMovies = React.useMemo(
+    () => displayedMovies.slice(0, filmPageSize),
+    [displayedMovies, filmPageSize]
+  )
 
   const huidigeRegisseurKey = selectedGenre || "Algemeen"
   const geselecteerdeRegisseur = REGISSEUR_SUGGESTIES[huidigeRegisseurKey] || REGISSEUR_SUGGESTIES["Algemeen"]
@@ -563,15 +612,52 @@ export default function CanaryDashboard() {
         {/* Sliders Container */}
         <div className="space-y-4 pt-2">
           <div className="space-y-3 bg-slate-50/50 p-4 rounded-2xl border border-slate-200/60 shadow-sm transition-all hover:border-slate-300/80">
-            <div className="flex items-center justify-between">
-              <label className="text-[11px] font-bold text-slate-700 uppercase flex items-center gap-1.5">
-                <DollarSign size={14} className="text-amber-500" /> Max. Budget
-              </label>
-              <span className="text-[11px] font-bold text-indigo-700 font-mono bg-white px-2 py-0.5 rounded-md border border-indigo-100 shadow-sm">
-                €{maxBudget}M
-              </span>
+            <label className="text-[11px] font-bold text-slate-700 uppercase flex items-center gap-1.5">
+              <DollarSign size={14} className="text-amber-500" /> Budget
+            </label>
+            <div className="flex items-center gap-2">
+              {([
+                { key: "min", value: budgetInputMin, set: setBudgetInputMin, side: "min" },
+                { key: "max", value: budgetInputMax, set: setBudgetInputMax, side: "max" },
+              ] as const).map(({ key, value, set, side }) => (
+                <div key={key} className="flex items-center gap-1 flex-1 text-[11px] font-bold text-indigo-700 font-mono bg-white rounded-md border border-indigo-100 shadow-sm overflow-hidden">
+                  <span className="pl-2 text-slate-400">€</span>
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    value={value}
+                    onChange={(e) => set(e.target.value)}
+                    onBlur={(e) => {
+                      const raw = parseBudget(e.target.value)
+                      if (side === "min") {
+                        const val = Math.min(budgetRange[1] - 1_000, Math.max(10_000, raw))
+                        setBudgetRange([val, budgetRange[1]])
+                        set(formatBudget(val))
+                      } else {
+                        const val = Math.max(budgetRange[0] + 1_000, raw)
+                        setBudgetRange([budgetRange[0], val])
+                        set(formatBudget(val))
+                      }
+                    }}
+                    onKeyDown={(e) => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur() }}
+                    className="w-full pr-2 py-0.5 text-right bg-transparent focus:outline-none"
+                  />
+                </div>
+              ))}
             </div>
-            <Slider value={[maxBudget]} onValueChange={(val) => setMaxBudget(val[0])} min={1} max={1000} step={5} className="cursor-grab" />
+            <Slider
+              value={budgetRange}
+              onValueChange={(val) => {
+                setBudgetRange([val[0], val[1]])
+                setBudgetInputMin(formatBudget(val[0]))
+                setBudgetInputMax(formatBudget(val[1]))
+              }}
+              min={10_000}
+              max={budgetCeiling}
+              step={1_000}
+              minStepsBetweenThumbs={1}
+              className="cursor-grab"
+            />
           </div>
 
           <div className="space-y-3 bg-slate-50/50 p-4 rounded-2xl border border-slate-200/60 shadow-sm transition-all hover:border-slate-300/80">
@@ -583,7 +669,12 @@ export default function CanaryDashboard() {
                 {yearRange[0]} - {yearRange[1]}
               </span>
             </div>
-            <Slider value={yearRange} onValueChange={(val) => setYearRange(val)} min={1970} max={2026} step={1} className="cursor-grab" />
+            <Slider value={yearRange} onValueChange={(val) => {
+                setBudgetRange(prev => [prev[0], 1_000_000_000])
+                setBudgetCeiling(1_000_000_000)
+                setBudgetInputMax(formatBudget(1_000_000_000))
+                setYearRange(val)
+              }} min={1970} max={2026} step={1} className="cursor-grab" />
           </div>
         </div>
       </aside>
@@ -833,7 +924,20 @@ export default function CanaryDashboard() {
                   className="pl-9 text-xs h-9 bg-white border-slate-200 rounded-xl focus-visible:ring-indigo-500/20 focus-visible:border-indigo-400 transition-all"
                 />
               </div>
-              <span className="text-xs bg-slate-100 text-slate-600 font-mono px-3 py-1 rounded-full font-bold border border-slate-200 shadow-sm whitespace-nowrap">{displayedMovies.length} resultaten</span>
+              <div className="flex items-center gap-2 bg-slate-100 border border-slate-200 rounded-full px-3 py-1 shadow-sm">
+                <span className="text-[11px] font-medium text-slate-500 whitespace-nowrap">Resultaten weergeven :</span>
+                {([10, 50, 200] as const).map((size, i) => (
+                  <React.Fragment key={size}>
+                    {i > 0 && <span className="text-slate-300 text-xs">/</span>}
+                    <button
+                      onClick={() => setFilmPageSize(size)}
+                      className={`text-xs font-bold font-mono transition-all ${filmPageSize === size ? "text-slate-900" : "text-slate-400 hover:text-slate-700"}`}
+                    >
+                      {size}
+                    </button>
+                  </React.Fragment>
+                ))}
+              </div>
             </div>
           </div>
 
@@ -891,9 +995,9 @@ export default function CanaryDashboard() {
           </div>
           
           <div className="p-3 overflow-y-auto max-h-[600px] scrollbar-thin scrollbar-thumb-slate-200 scrollbar-track-transparent">
-            {displayedMovies.length > 0 ? (
+            {paginatedMovies.length > 0 ? (
               <div className="space-y-2.5">
-                {displayedMovies.map((movie, index) => {
+                {paginatedMovies.map((movie, index) => {
                   const isExpanded = expandedMovieId === movie.id
                   const liveImdbRating = movie.imdbRating && !isNaN(Number(movie.imdbRating)) 
                     ? Number(movie.imdbRating).toFixed(1) 
