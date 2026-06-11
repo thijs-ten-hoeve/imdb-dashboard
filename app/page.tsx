@@ -123,6 +123,8 @@ interface GenreInfo {
   avgMarginPct: number
 }
 
+const MAX_VISIBLE_ACTORS = 12 // 3 rijen x 4 kolommen (lg breakpoint)
+
 function formatBudget(value: number): string {
   if (value >= 1_000_000) {
     const m = value / 1_000_000
@@ -150,8 +152,10 @@ export default function CanaryDashboard() {
   const [masterCatalog, setMasterCatalog] = React.useState<MovieData[]>([])
   const [allActors, setAllActors] = React.useState<ActorInfo[]>([])
   const [searchedActors, setSearchedActors] = React.useState<ActorInfo[] | null>(null)
+  const [genreActors, setGenreActors] = React.useState<ActorInfo[] | null>(null)
   const [isActorsLoading, setIsActorsLoading] = React.useState(true)
   const [isSearchingActors, setIsSearchingActors] = React.useState(false)
+  const [isGenreActorsLoading, setIsGenreActorsLoading] = React.useState(false)
   const [genreStats, setGenreStats] = React.useState<GenreInfo[]>([])
   
   // Laad States
@@ -254,6 +258,34 @@ export default function CanaryDashboard() {
 
     return () => clearTimeout(timeout);
   }, [actorSearchQuery]);
+
+  React.useEffect(() => {
+    if (!selectedGenre) {
+      setGenreActors(null);
+      return;
+    }
+
+    let cancelled = false;
+
+    async function fetchGenreActors() {
+      setIsGenreActorsLoading(true);
+      try {
+        const url = new URL('/api/actors', window.location.origin);
+        url.searchParams.set('genre', selectedGenre as string);
+        const res = await fetch(url.toString());
+        if (res.ok && !cancelled) {
+          setGenreActors(await res.json());
+        }
+      } catch (error) {
+        console.error('Fout bij ophalen acteurs voor genre:', error);
+      } finally {
+        if (!cancelled) setIsGenreActorsLoading(false);
+      }
+    }
+
+    fetchGenreActors();
+    return () => { cancelled = true; };
+  }, [selectedGenre]);
 
   React.useEffect(() => {
     const delayDebounceFn = setTimeout(async () => {
@@ -425,19 +457,18 @@ export default function CanaryDashboard() {
   const getoondeActeurs = React.useMemo(() => {
     const query = actorSearchQuery.toLowerCase().trim()
 
+    let result: ActorInfo[]
     if (query.length >= 2) {
       const source = searchedActors ?? allActors.filter(a => a.name.toLowerCase().includes(query))
-      return [...source].sort((a, b) => b.score - a.score)
+      result = [...source].sort((a, b) => b.score - a.score)
+    } else if (selectedGenre) {
+      result = [...(genreActors ?? [])].sort((a, b) => b.score - a.score)
+    } else {
+      result = [...allActors].sort((a, b) => b.score - a.score)
     }
 
-    const ranked = [...allActors].sort((a, b) => b.score - a.score)
-
-    if (selectedGenre) {
-      return ranked.filter(a => a.genre === selectedGenre)
-    }
-
-    return ranked.slice(0, 32)
-  }, [selectedGenre, actorSearchQuery, allActors, searchedActors])
+    return result.slice(0, MAX_VISIBLE_ACTORS)
+  }, [selectedGenre, actorSearchQuery, allActors, searchedActors, genreActors])
 
   const toggleCastMember = (e: React.MouseEvent, actor: ActorInfo) => {
     e.stopPropagation()
@@ -727,12 +758,12 @@ export default function CanaryDashboard() {
 
         {/* Talent & Cast Selectie Rij */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 items-stretch">
-          <Card className="md:col-span-3 bg-white border-slate-200/80 shadow-sm rounded-3xl p-5 flex flex-col gap-2 h-[280px] overflow-hidden transition-all duration-300">
+          <Card className="md:col-span-3 bg-white border-slate-200/80 shadow-sm rounded-3xl p-5 flex flex-col gap-2 transition-all duration-300">
             <div className="flex justify-between items-center border-b border-slate-100 pb-2 shrink-0">
               <div>
                 <span className="text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center gap-1.5"><Users size={14} className="text-indigo-500" /> Acteurs</span>
                 <span className="text-[11px] text-slate-500 block mt-1">
-                  {isActorsLoading
+                  {isActorsLoading || (selectedGenre ? isGenreActorsLoading : false)
                     ? "Talent laden..."
                     : selectedGenre
                       ? `Aanbevolen voor ${selectedGenre}`
@@ -765,7 +796,7 @@ export default function CanaryDashboard() {
               </div>
             )}
 
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2 flex-1 min-h-0 overflow-y-auto pr-2 scrollbar-thin scrollbar-thumb-slate-200 scrollbar-track-transparent">
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2 content-start">
               {getoondeActeurs.length > 0 ? (
                 getoondeActeurs.map(acteur => {
                   const isAdded = chosenCast.some(a => a.name === acteur.name)
@@ -788,7 +819,7 @@ export default function CanaryDashboard() {
                 })
               ) : (
                 <div className="text-center p-4 text-[12px] text-slate-400 bg-slate-50/50 rounded-xl border border-dashed border-slate-200 col-span-full">
-                  {isActorsLoading
+                  {isActorsLoading || (selectedGenre ? isGenreActorsLoading : false)
                     ? "Acteurs laden uit de database..."
                     : actorSearchQuery.trim().length >= 2
                       ? "Geen acteurs gevonden voor deze zoekopdracht."

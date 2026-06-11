@@ -4,6 +4,7 @@ import { pool } from '@/lib/db';
 
 const DEFAULT_LIMIT = 120;
 const SEARCH_LIMIT = 80;
+const GENRE_LIMIT = 40;
 
 function formatActor(row: { talent_id: string; name: string; birth_year: number | null; death_year: number | null; roleCount: number; primaryGenre: string | null }, maxRoleCount: number) {
   const nameParts = row.name.split(' ');
@@ -76,19 +77,57 @@ async function queryActors(search: string, limit: number) {
   return rows as { talent_id: string; name: string; birth_year: number | null; death_year: number | null; roleCount: number; primaryGenre: string | null }[];
 }
 
+async function queryActorsByGenre(genre: string, limit: number) {
+  const query = `
+    SELECT
+      n.talent_id,
+      n.talent_name AS name,
+      n.birth_year,
+      n.death_year,
+      agg.roleCount
+    FROM (
+      SELECT tp.talent_id, COUNT(DISTINCT tp.title_id) AS roleCount
+      FROM genre g
+      STRAIGHT_JOIN title_genre tg ON tg.genre_id = g.genre_id
+      STRAIGHT_JOIN title_principal tp ON tp.title_id = tg.title_id
+      STRAIGHT_JOIN category c ON tp.category_id = c.category_id
+      WHERE g.genre_name = ?
+        AND c.category_name IN ('actor', 'actress')
+      GROUP BY tp.talent_id
+      ORDER BY roleCount DESC
+      LIMIT ${limit}
+    ) AS agg
+    JOIN talent n ON n.talent_id = agg.talent_id
+    ORDER BY agg.roleCount DESC
+  `;
+
+  const [rows] = await pool.execute(query, [genre]);
+  return (rows as { talent_id: string; name: string; birth_year: number | null; death_year: number | null; roleCount: number }[])
+    .map((row) => ({ ...row, primaryGenre: genre }));
+}
+
 const getCachedActors = unstable_cache(
   async () => queryActors('', DEFAULT_LIMIT),
   ['actors-default'],
   { revalidate: 300 }
 );
 
+const getCachedActorsByGenre = unstable_cache(
+  async (genre: string) => queryActorsByGenre(genre, GENRE_LIMIT),
+  ['actors-by-genre'],
+  { revalidate: 300 }
+);
+
 export async function GET(request: NextRequest) {
   try {
     const search = request.nextUrl.searchParams.get('search')?.trim() ?? '';
+    const genre = request.nextUrl.searchParams.get('genre')?.trim() ?? '';
 
     let actorRows;
     if (search) {
       actorRows = await queryActors(search, SEARCH_LIMIT);
+    } else if (genre) {
+      actorRows = await getCachedActorsByGenre(genre);
     } else {
       actorRows = await getCachedActors();
     }
