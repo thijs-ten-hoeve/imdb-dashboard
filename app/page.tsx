@@ -1127,10 +1127,9 @@ export default function CanaryDashboard() {
                                   rel="noopener noreferrer"
                                   className="flex items-center"
                                 >
-                                  <svg xmlns="http://www.w3.org/2000/svg" aria-label="IMDb" viewBox="0 0 62 16" width="62" height="16" style={{ display: 'block' }}>
-                                    <rect width="62" height="16" rx="2.5" fill="#F5C518"/>
-                                    <text x="31" y="11.5" fontSize="9.5" fontWeight="800" textAnchor="middle" fontFamily="Arial Black,Arial,sans-serif" fill="#000000" letterSpacing="-0.2">{liveImdbRating} IMDb</text>
-                                  </svg>
+                                  <span style={{ background: '#F5C518', fontFamily: '"Arial Black", Arial, sans-serif', letterSpacing: '-0.2px' }} className="inline-block text-black font-black text-[10px] leading-none px-1.5 py-[3px] rounded-[3px]">
+                                    {liveImdbRating} IMDb
+                                  </span>
                                 </a>
                               )}
                               <span className="font-semibold text-slate-600">{movie.year}</span>
