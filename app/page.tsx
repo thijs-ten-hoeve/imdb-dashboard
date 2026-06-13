@@ -774,6 +774,7 @@ export default function CanaryDashboard() {
         <div className="mt-auto pt-4 border-t border-slate-100 flex items-center justify-between">
           <div>
             <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Laatste update</p>
+            {lastUpdated && <p className="text-[10px] text-emerald-600 font-medium">Je hebt de laatste data.</p>}
             <p className="text-[11px] font-mono text-slate-500 mt-0.5">
               {lastUpdated
                 ? lastUpdated.toLocaleTimeString('nl-NL', { hour: '2-digit', minute: '2-digit' }) + ' ' +
