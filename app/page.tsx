@@ -489,12 +489,20 @@ export default function CanaryDashboard() {
 
   const rankedGenres = React.useMemo(() => {
     const maxBudgetM = budgetRange[1] / 1_000_000
+    const BASE_PROFIT = 0.15 // gemiddeld genre geeft 15% winst op max budget
+
+    // Globaal gemiddelde ratio (gewogen naar titleCount) als referentiepunt
+    const allRatioStats = genreStats.filter(s => s.avgRevBudgetRatio != null && s.titleCount > 0)
+    const allTitles = allRatioStats.reduce((sum, s) => sum + s.titleCount, 0)
+    const globalRatio = allTitles > 0
+      ? allRatioStats.reduce((sum, s) => sum + s.avgRevBudgetRatio! * s.titleCount, 0) / allTitles
+      : 3.0
+
     return genreStats
       .map((genre) => {
-        const ratio = Math.min(genre.avgRevBudgetRatio ?? 1, 2.5)
-        // success factor: ratio is van films MET revenue data (survivors);
-        // ~30% kans dat een film daadwerkelijk winstgevend wordt
-        const winstM = Math.round(maxBudgetM * (ratio - 1) * 0.3 * 10) / 10
+        // Winst relatief aan het genre-gemiddelde: beter dan gemiddeld genre = meer winst
+        const ratio = genre.avgRevBudgetRatio ?? globalRatio
+        const winstM = Math.round(maxBudgetM * BASE_PROFIT * (ratio / globalRatio) * 10) / 10
         return {
           name: genre.name,
           titleCount: genre.titleCount,
@@ -579,7 +587,7 @@ export default function CanaryDashboard() {
       avgDuration,
       titleCount: totalTitles,
     }
-  }, [selectedGenres, searchedSuitableActor, genreStats, rankedGenres, budgetRange])
+  }, [selectedGenres, searchedSuitableActor, genreStats, budgetRange])
 
   const displayedMovies = React.useMemo(() => {
     const query = filmSearchQuery.toLowerCase().trim()
