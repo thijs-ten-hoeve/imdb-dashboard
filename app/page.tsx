@@ -689,70 +689,37 @@ export default function CanaryDashboard() {
         </div>
 
         {/* Genre Filter */}
-        <div className="space-y-2" ref={genreDropdownRef}>
+        <div className="space-y-3">
           <div className="flex items-center justify-between px-1">
             <span className="text-xs font-bold text-slate-700 uppercase tracking-wider block">Kies een genre</span>
             {selectedGenre && (
               <button onClick={() => handleGenreChange(null)} className="text-[10px] bg-amber-100 text-amber-700 px-2 py-1 rounded-md font-bold hover:bg-amber-200 transition-colors">
-                Reset
+                Reset Filter
               </button>
             )}
           </div>
 
-          {/* Trigger knop */}
-          <button
-            onClick={() => setShowGenreDropdown(v => !v)}
-            className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl border text-xs font-semibold transition-all ${
-              selectedGenre
-                ? "bg-amber-50 border-amber-300 text-amber-800 hover:bg-amber-100"
-                : "bg-white border-slate-200 text-slate-600 hover:border-amber-300 hover:text-amber-700"
-            }`}
-          >
-            <span className="flex items-center gap-2">
-              {selectedGenre && <span className="w-2 h-2 rounded-full bg-amber-400 shrink-0" />}
-              {selectedGenre ? genreNl(selectedGenre) : "Selecteer genre..."}
-            </span>
-            <span className="flex items-center gap-2 shrink-0">
-              {selectedGenre && (() => {
-                const g = rankedGenres.find(g => g.name === selectedGenre)
-                return g && g.titleCount > 0
-                  ? <span className="font-mono text-[10px] text-amber-600 font-bold">€{g.value.toFixed(1)}M</span>
-                  : null
-              })()}
-              <ChevronDown size={14} className={`transition-transform duration-200 text-amber-500 ${showGenreDropdown ? "rotate-180" : "text-slate-400"}`} />
-            </span>
-          </button>
-
-          {/* Dropdown lijst */}
-          {showGenreDropdown && (
-            <div className="rounded-xl border border-slate-200 bg-white shadow-lg overflow-hidden">
-              <div className="max-h-[260px] overflow-y-auto scrollbar-thin scrollbar-thumb-slate-200 scrollbar-track-transparent">
-                {rankedGenres.map((genreItem) => {
-                  const isSelected = genreItem.name === selectedGenre
-                  return (
-                    <button
-                      key={genreItem.name}
-                      onClick={() => { handleGenreChange(isSelected ? null : genreItem.name); setShowGenreDropdown(false) }}
-                      className={`w-full flex items-center justify-between px-3 py-2 text-xs transition-colors border-b border-slate-100 last:border-0 ${
-                        isSelected
-                          ? "bg-amber-50 text-amber-800 font-bold"
-                          : "text-slate-700 hover:bg-amber-50 hover:text-amber-800"
-                      }`}
-                    >
-                      <span className="flex items-center gap-2">
-                        {isSelected && <span className="w-1.5 h-1.5 rounded-full bg-amber-500 shrink-0" />}
-                        {!isSelected && <span className="w-1.5 h-1.5 rounded-full bg-transparent shrink-0" />}
-                        {genreNl(genreItem.name)}
-                      </span>
-                      <span className="font-mono text-[10px] text-slate-400 shrink-0">
-                        {genreItem.titleCount > 0 ? `€${genreItem.value.toFixed(1)}M` : "—"}
-                      </span>
-                    </button>
-                  )
-                })}
-              </div>
-            </div>
-          )}
+          <div className="grid grid-cols-2 gap-2.5 max-h-[250px] overflow-y-auto pr-1 scrollbar-thin scrollbar-thumb-slate-200 scrollbar-track-transparent">
+            {rankedGenres.map((genreItem) => {
+              const isSelected = genreItem.name === selectedGenre
+              return (
+                <button
+                  key={genreItem.name}
+                  onClick={() => handleGenreChange(isSelected ? null : genreItem.name)}
+                  className={`p-3 rounded-xl text-xs text-center transition-all duration-300 active:scale-95 border ${
+                    isSelected
+                      ? "bg-gradient-to-b from-amber-400 to-amber-500 border-amber-400 text-white font-bold shadow-md shadow-amber-400/30 ring-2 ring-amber-300/40"
+                      : "bg-white border-slate-200 text-slate-600 hover:border-amber-300 hover:shadow-sm hover:text-amber-800"
+                  }`}
+                >
+                  <span className="block truncate">{genreNl(genreItem.name)}</span>
+                  <span className={`text-[11px] font-mono block mt-1 ${isSelected ? 'text-amber-100 font-bold' : 'text-slate-400'}`}>
+                    {genreItem.titleCount > 0 ? `€${genreItem.value.toFixed(1)}M gem.` : "—"}
+                  </span>
+                </button>
+              )
+            })}
+          </div>
         </div>
 
         {/* Sliders Container */}
@@ -1118,8 +1085,7 @@ export default function CanaryDashboard() {
                               {movie.title}
                             </a>
                             <div className="flex items-center gap-2 mt-1.5 flex-wrap text-[11px] font-mono text-slate-500">
-                              <span className="font-sans font-bold text-indigo-800 bg-indigo-100/50 px-2 py-0.5 rounded-md border border-indigo-100">{movie.genre}</span>
-                              <span className="bg-slate-100 px-2 py-0.5 rounded-md text-slate-600 border border-slate-200/60">{movie.type}</span>
+                              <span className="font-sans font-bold text-indigo-800 bg-indigo-100/50 px-2 py-0.5 rounded-md border border-indigo-100">{genreNl(movie.genre)}</span>
                               {liveImdbRating && (
                                 <a
                                   href={`https://www.imdb.com/title/${movie.id}/`}
@@ -1127,7 +1093,7 @@ export default function CanaryDashboard() {
                                   rel="noopener noreferrer"
                                   className="flex items-center"
                                 >
-                                  <span style={{ background: '#F5C518', fontFamily: '"Arial Black", Arial, sans-serif', letterSpacing: '-0.2px' }} className="inline-block text-black font-black text-[10px] leading-none px-1 py-[2px] rounded-[3px]">
+                                  <span style={{ background: '#F5C518', fontFamily: '"Arial Black", Arial, sans-serif', letterSpacing: '-0.2px' }} className="inline-block text-black font-black text-[10px] leading-none px-1 py-[2px] rounded-[3px] ring-1 ring-amber-600/30">
                                     IMDb {liveImdbRating}
                                   </span>
                                 </a>
