@@ -704,12 +704,23 @@ export default function CanaryDashboard() {
             onClick={() => setShowGenreDropdown(v => !v)}
             className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl border text-xs font-semibold transition-all ${
               selectedGenre
-                ? "bg-gradient-to-r from-amber-500 to-amber-600 border-amber-500 text-white shadow-sm shadow-amber-400/20"
-                : "bg-white border-slate-200 text-slate-600 hover:border-amber-400 hover:text-amber-700"
+                ? "bg-amber-50 border-amber-300 text-amber-800 hover:bg-amber-100"
+                : "bg-white border-slate-200 text-slate-600 hover:border-amber-300 hover:text-amber-700"
             }`}
           >
-            <span>{selectedGenre ? genreNl(selectedGenre) : "Selecteer genre..."}</span>
-            <ChevronDown size={14} className={`transition-transform duration-200 ${showGenreDropdown ? "rotate-180" : ""}`} />
+            <span className="flex items-center gap-2">
+              {selectedGenre && <span className="w-2 h-2 rounded-full bg-amber-400 shrink-0" />}
+              {selectedGenre ? genreNl(selectedGenre) : "Selecteer genre..."}
+            </span>
+            <span className="flex items-center gap-2 shrink-0">
+              {selectedGenre && (() => {
+                const g = rankedGenres.find(g => g.name === selectedGenre)
+                return g && g.titleCount > 0
+                  ? <span className="font-mono text-[10px] text-amber-600 font-bold">€{g.value.toFixed(1)}M</span>
+                  : null
+              })()}
+              <ChevronDown size={14} className={`transition-transform duration-200 text-amber-500 ${showGenreDropdown ? "rotate-180" : "text-slate-400"}`} />
+            </span>
           </button>
 
           {/* Dropdown lijst */}
