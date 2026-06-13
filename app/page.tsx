@@ -528,12 +528,14 @@ export default function CanaryDashboard() {
     // Gewogen statistieken (gewogen naar titleCount per genre)
     const totalTitles = matchingStats.reduce((sum, s) => sum + s.titleCount, 0)
 
-    // Gebruik echte revenue/budget ratio uit de database
+    // Gebruik echte revenue/budget ratio uit de database, gecapped op 3.5×
+    // (zelfs het meest winstgevende genre returnt gemiddeld niet meer dan ~3-4× budget)
     const ratioStats = matchingStats.filter(s => s.avgRevBudgetRatio != null)
     const ratioTitles = ratioStats.reduce((sum, s) => sum + s.titleCount, 0)
-    const weightedRatio = ratioTitles > 0
+    const rawRatio = ratioTitles > 0
       ? ratioStats.reduce((sum, s) => sum + s.avgRevBudgetRatio! * s.titleCount, 0) / ratioTitles
-      : 1.5 // fallback: 50% winst als er geen ratio-data is
+      : 1.5
+    const weightedRatio = Math.min(rawRatio, 3.5) // cap: winst nooit meer dan 2.5× max budget
     const maxBudgetM = budgetRange[1] / 1_000_000
     const baseWinstM = Math.round(maxBudgetM * (weightedRatio - 1) * 10) / 10
 
