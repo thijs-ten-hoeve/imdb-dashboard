@@ -14,6 +14,7 @@ import {
 
 import { Card } from "@/components/ui/card"
 import { Slider } from "@/components/ui/slider"
+import { genreNl } from "@/lib/genres-nl"
 import { Input } from "@/components/ui/input"
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
@@ -151,7 +152,8 @@ export default function CanaryDashboard() {
   const [allActors, setAllActors] = React.useState<ActorInfo[]>([])
   const [genreActors, setGenreActors] = React.useState<ActorInfo[] | null>(null)
   const [genreStats, setGenreStats] = React.useState<GenreInfo[]>([])
-  const [topDirector, setTopDirector] = React.useState<DirectorInfo | null>(null)
+  const [topDirectors, setTopDirectors] = React.useState<DirectorInfo[]>([])
+  const [selectedSuitableDirectorId, setSelectedSuitableDirectorId] = React.useState<string | null>(null)
   
   // Laad States
   const [isInitialLoading, setIsInitialLoading] = React.useState(true) 
@@ -197,6 +199,11 @@ export default function CanaryDashboard() {
   const [moreActorsPosition, setMoreActorsPosition] = React.useState<{ x: number; y: number }>({ x: 0, y: 0 })
   const moreActorsRef = React.useRef<HTMLDivElement>(null)
   const [expandedActorInDropdown, setExpandedActorInDropdown] = React.useState<string | null>(null)
+
+  const [showMoreDirectors, setShowMoreDirectors] = React.useState(false)
+  const [moreDirectorsPosition, setMoreDirectorsPosition] = React.useState<{ x: number; y: number }>({ x: 0, y: 0 })
+  const moreDirectorsRef = React.useRef<HTMLDivElement>(null)
+  const [expandedDirectorInDropdown, setExpandedDirectorInDropdown] = React.useState<string | null>(null)
   const [selectedSuitableActorId, setSelectedSuitableActorId] = React.useState<string | null>(null)
   const [searchedSuitableActor, setSearchedSuitableActor] = React.useState<ActorInfo | null>(null)
 
@@ -252,7 +259,7 @@ export default function CanaryDashboard() {
       }
 
       const dp = filterParams();
-      dp.set('limit', '1');
+      dp.set('limit', '8');
       if (selectedGenre) dp.set('genre', selectedGenre);
       try {
         const dirUrl = new URL('/api/directors', window.location.origin);
@@ -260,8 +267,7 @@ export default function CanaryDashboard() {
         const dirRes = await fetch(dirUrl.toString());
         if (dirRes.ok && !cancelled) {
           const data = await dirRes.json();
-          if (data.length > 0) setTopDirector(data[0]);
-          else setTopDirector(null);
+          setTopDirectors(data);
         }
       } catch (error) {
         console.error('Fout bij ophalen regisseur:', error);
@@ -388,6 +394,34 @@ export default function CanaryDashboard() {
     setShowMoreActors(true)
   }
 
+  React.useEffect(() => {
+    function handleOutsideClick(event: MouseEvent) {
+      if (moreDirectorsRef.current && !moreDirectorsRef.current.contains(event.target as Node)) {
+        setShowMoreDirectors(false)
+        setExpandedDirectorInDropdown(null)
+      }
+    }
+    if (showMoreDirectors) document.addEventListener("click", handleOutsideClick)
+    return () => document.removeEventListener("click", handleOutsideClick)
+  }, [showMoreDirectors])
+
+  const toggleMoreDirectors = (e: React.MouseEvent) => {
+    e.stopPropagation()
+    e.nativeEvent.stopImmediatePropagation()
+
+    if (showMoreDirectors) {
+      setShowMoreDirectors(false)
+      return
+    }
+
+    const screenWidth = window.innerWidth
+    let targetX = e.pageX + 10
+    if (targetX + 280 > screenWidth) targetX = screenWidth - 300
+    setMoreDirectorsPosition({ x: targetX, y: e.pageY + 10 })
+    setPopupContent(null)
+    setShowMoreDirectors(true)
+  }
+
   const handleGenreChange = (genre: string | null) => {
     setBudgetRange([1_000_000, 1_000_000_000])
     setBudgetCeiling(1_000_000_000)
@@ -395,8 +429,10 @@ export default function CanaryDashboard() {
     setSelectedGenre(genre)
     setPopupContent(null)
     setShowMoreActors(false)
+    setShowMoreDirectors(false)
     setSelectedActorFilter(null)
     setSelectedSuitableActorId(null)
+    setSelectedSuitableDirectorId(null)
     setSearchedSuitableActor(null)
   }
 
@@ -498,7 +534,13 @@ export default function CanaryDashboard() {
     [displayedMovies, filmPageSize]
   )
 
-  const geselecteerdeRegisseur: DirectorInfo = topDirector ?? { name: "—", initials: "?", bio: "Laden..." }
+  const geselecteerdeRegisseur = React.useMemo<DirectorInfo>(() => {
+    if (selectedSuitableDirectorId) {
+      const found = topDirectors.find(d => d.id === selectedSuitableDirectorId)
+      if (found) return found
+    }
+    return topDirectors[0] ?? { name: "—", initials: "?", bio: "Laden..." }
+  }, [topDirectors, selectedSuitableDirectorId])
 
   const rankedActeursVoorContext = React.useMemo<ActorInfo[]>(() => {
     const source = selectedGenre ? (genreActors ?? []) : allActors
@@ -657,7 +699,7 @@ export default function CanaryDashboard() {
                       : "bg-white border-slate-200 text-slate-600 hover:border-indigo-300 hover:shadow-sm hover:text-indigo-900"
                   }`}
                 >
-                  <span className="block truncate">{genreItem.name}</span>
+                  <span className="block truncate">{genreNl(genreItem.name)}</span>
                   <span className={`text-[11px] font-mono block mt-1 ${isSelected ? 'text-indigo-200 font-bold' : 'text-slate-400'}`}>
                     {genreItem.titleCount > 0 ? `€${genreItem.value.toFixed(1)}M gem.` : "—"}
                   </span>
@@ -734,7 +776,7 @@ export default function CanaryDashboard() {
                   <p className="text-xs font-bold text-indigo-700/80 uppercase font-mono tracking-wider flex items-center gap-1.5">
                     <Layers size={14} className="text-indigo-500" /> Genre
                   </p>
-                  <h2 className="text-2xl sm:text-3xl font-extrabold text-slate-900 mt-1">{selectedGenreSummary.name}</h2>
+                  <h2 className="text-2xl sm:text-3xl font-extrabold text-slate-900 mt-1">{genreNl(selectedGenreSummary.name)}</h2>
                   <span className="text-[11px] text-slate-500 font-medium mt-2 flex items-center gap-2">
                     <span>Overzicht van prestaties & statistieken</span>
                   </span>
@@ -758,19 +800,28 @@ export default function CanaryDashboard() {
                 </>
               )}
 
-              <button onClick={(e) => openContextPopup(e, "director", geselecteerdeRegisseur)} className="flex items-center gap-3 p-2.5 pr-5 bg-white/80 border border-indigo-200/60 rounded-2xl shadow-sm text-left hover:border-indigo-400 hover:shadow-md transition-all duration-300 group w-max shrink-0">
-                <div className="w-10 h-10 bg-indigo-950 text-white rounded-xl flex items-center justify-center font-bold font-mono shadow-md group-hover:scale-105 group-hover:rotate-3 transition-transform overflow-hidden">
-                  <TmdbAvatar name={geselecteerdeRegisseur.name} initials={geselecteerdeRegisseur.initials} />
+              <div className="flex items-center gap-1 p-2.5 pr-3 bg-white/80 border border-indigo-200/60 rounded-2xl shadow-sm hover:border-indigo-400 hover:shadow-md transition-all duration-300 group w-max shrink-0">
+                <div className="flex items-center gap-3 pr-2">
+                  <div className="w-10 h-10 bg-indigo-950 text-white rounded-xl flex items-center justify-center font-bold font-mono shadow-md group-hover:scale-105 group-hover:rotate-3 transition-transform overflow-hidden">
+                    <TmdbAvatar name={geselecteerdeRegisseur.name} initials={geselecteerdeRegisseur.initials} />
+                  </div>
+                  <div>
+                    <p className="text-[10px] font-bold text-slate-400 uppercase font-mono tracking-wider flex items-center gap-1 mb-0.5">
+                      <UserCheck size={12} className="text-indigo-500" /> Geschikte regisseur
+                    </p>
+                    <h4 className="text-sm font-extrabold text-slate-800">{geselecteerdeRegisseur.name}</h4>
+                  </div>
                 </div>
-                <div>
-                  <p className="text-[10px] font-bold text-slate-400 uppercase font-mono tracking-wider flex items-center gap-1 mb-0.5">
-                    <UserCheck size={12} className="text-indigo-500" /> Geschikte regisseur
-                  </p>
-                  <h4 className="text-sm font-extrabold text-slate-800 group-hover:text-indigo-600 transition-colors">
-                    {geselecteerdeRegisseur.name}
-                  </h4>
-                </div>
-              </button>
+                {topDirectors.length > 1 && (
+                  <button
+                    onClick={toggleMoreDirectors}
+                    title="Wijzig geschikte regisseur"
+                    className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border text-xs font-semibold transition-colors shrink-0 ${showMoreDirectors ? "bg-indigo-950 border-indigo-950 text-white" : "bg-slate-50 border-slate-200 text-slate-500 hover:text-indigo-600 hover:border-indigo-300"}`}
+                  >
+                    <Pencil size={12} /> Verander
+                  </button>
+                )}
+              </div>
 
               {geselecteerdeActeur && (
                 <div className="flex items-center gap-1 p-2.5 pr-3 bg-white/80 border border-indigo-200/60 rounded-2xl shadow-sm hover:border-indigo-400 hover:shadow-md transition-all duration-300 group w-max shrink-0">
@@ -820,14 +871,15 @@ export default function CanaryDashboard() {
                     </linearGradient>
                   </defs>
                   <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                  <XAxis 
-                    dataKey="name" 
-                    axisLine={false} 
-                    tickLine={false} 
-                    tick={{ fontSize: 10, fill: '#64748b', fontWeight: 600 }} 
-                    angle={-25} 
-                    textAnchor="end" 
-                    height={40} 
+                  <XAxis
+                    dataKey="name"
+                    axisLine={false}
+                    tickLine={false}
+                    tick={{ fontSize: 10, fill: '#64748b', fontWeight: 600 }}
+                    angle={-25}
+                    textAnchor="end"
+                    height={40}
+                    tickFormatter={(val) => genreNl(val)}
                   />
                   <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#94a3b8' }} tickFormatter={(val) => `€${val}M`} />
                   <RechartsTooltip 
@@ -1149,7 +1201,7 @@ export default function CanaryDashboard() {
       {showMoreActors && (
         <div ref={moreActorsRef} className="absolute w-[280px] bg-white/95 backdrop-blur-xl rounded-2xl border border-slate-200 p-3 shadow-2xl z-50 animate-in fade-in zoom-in-95 duration-200" style={{ top: moreActorsPosition.y, left: moreActorsPosition.x }}>
           <p className="text-[10px] font-bold text-slate-400 uppercase font-mono tracking-wider px-1 pb-2 mb-2 border-b border-slate-100">
-            Top acteurs{selectedGenre ? ` · ${selectedGenre}` : ""}
+            Top acteurs{selectedGenre ? ` · ${genreNl(selectedGenre)}` : ""}
           </p>
 
           {/* Zoekbalk */}
@@ -1157,7 +1209,7 @@ export default function CanaryDashboard() {
             <Search className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-slate-400" />
             <input
               type="text"
-              placeholder={selectedGenre ? `Zoek in ${selectedGenre}...` : "Zoek acteur..."}
+              placeholder={selectedGenre ? `Zoek in ${genreNl(selectedGenre)}...` : "Zoek acteur..."}
               value={actorSearchQuery}
               onChange={(e) => setActorSearchQuery(e.target.value)}
               className="w-full pl-7 pr-3 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:border-indigo-400 focus:ring-1 focus:ring-indigo-500/20 transition-all"
@@ -1181,7 +1233,7 @@ export default function CanaryDashboard() {
                     </div>
                     <div className="truncate flex-1">
                       <p className="text-xs font-bold text-slate-800 truncate group-hover:text-indigo-700 transition-colors">{acteur.name}</p>
-                      <span className="text-[10px] text-slate-400 font-mono">{acteur.genre}</span>
+                      <span className="text-[10px] text-slate-400 font-mono">{genreNl(acteur.genre)}</span>
                     </div>
                     <span className="text-[10px] font-mono font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded-md border border-emerald-100 shrink-0">{acteur.score}</span>
                   </button>
@@ -1215,7 +1267,7 @@ export default function CanaryDashboard() {
                           </div>
                           <div className="min-w-0">
                             <p className="text-xs font-bold text-slate-800">{acteur.name}</p>
-                            <p className="text-[10px] text-slate-500 font-mono">{acteur.genre}{acteur.birthYear ? ` · ${acteur.birthYear}` : ""}</p>
+                            <p className="text-[10px] text-slate-500 font-mono">{genreNl(acteur.genre)}{acteur.birthYear ? ` · ${acteur.birthYear}` : ""}</p>
                           </div>
                           <span className="ml-auto text-[11px] font-mono font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-100 shrink-0">{acteur.score}</span>
                         </div>
@@ -1232,6 +1284,60 @@ export default function CanaryDashboard() {
                 )
               })
             )}
+          </div>
+        </div>
+      )}
+
+      {showMoreDirectors && (
+        <div ref={moreDirectorsRef} className="absolute w-[280px] bg-white/95 backdrop-blur-xl rounded-2xl border border-slate-200 p-3 shadow-2xl z-50 animate-in fade-in zoom-in-95 duration-200" style={{ top: moreDirectorsPosition.y, left: moreDirectorsPosition.x }}>
+          <p className="text-[10px] font-bold text-slate-400 uppercase font-mono tracking-wider px-1 pb-2 mb-2 border-b border-slate-100">
+            Top regisseurs{selectedGenre ? ` · ${genreNl(selectedGenre)}` : ""}
+          </p>
+          <div className="space-y-1 max-h-[320px] overflow-y-auto">
+            {topDirectors.map((regisseur, i) => {
+              const isGekozen = geselecteerdeRegisseur?.id === regisseur.id
+              const isExpanded = expandedDirectorInDropdown === regisseur.id
+              return (
+                <div key={regisseur.id} className="rounded-xl overflow-hidden">
+                  <div
+                    className={`w-full flex items-center gap-2.5 p-1.5 transition-colors group cursor-pointer ${isExpanded ? "bg-indigo-50" : isGekozen ? "bg-indigo-50" : "hover:bg-indigo-50"}`}
+                    onClick={() => setExpandedDirectorInDropdown(isExpanded ? null : regisseur.id ?? null)}
+                  >
+                    <span className="text-[10px] font-bold text-slate-400 font-mono w-4 text-right shrink-0">{i + 1}</span>
+                    <div className="w-7 h-7 rounded-lg bg-slate-100 text-slate-600 border border-slate-200 flex items-center justify-center font-extrabold font-mono text-[10px] shrink-0 overflow-hidden group-hover:scale-105 transition-transform">
+                      <TmdbAvatar name={regisseur.name} initials={regisseur.initials} />
+                    </div>
+                    <span className="text-xs font-bold text-slate-800 truncate group-hover:text-indigo-700 transition-colors flex-1">{regisseur.name}</span>
+                    {isGekozen && !isExpanded && <Check size={14} className="text-indigo-600 shrink-0" />}
+                    <ChevronDown size={14} className={`text-slate-400 shrink-0 transition-transform duration-200 ${isExpanded ? "rotate-180" : ""}`} />
+                  </div>
+                  {isExpanded && (
+                    <div className="px-3 pb-3 pt-2 bg-indigo-50/70 border-t border-indigo-100 space-y-2">
+                      <div className="flex items-center gap-2.5">
+                        <div className="w-10 h-10 rounded-xl bg-indigo-200 text-indigo-900 border border-indigo-300 flex items-center justify-center font-extrabold font-mono text-sm shrink-0 overflow-hidden">
+                          <TmdbAvatar name={regisseur.name} initials={regisseur.initials} />
+                        </div>
+                        <div className="min-w-0">
+                          <p className="text-xs font-bold text-slate-800">{regisseur.name}</p>
+                          <p className="text-[10px] text-slate-500 font-mono">{regisseur.birthYear ? `Geboren ${regisseur.birthYear}` : ""}
+                          {regisseur.score != null && <span> · Score {regisseur.score}</span>}</p>
+                        </div>
+                        {regisseur.score != null && (
+                          <span className="ml-auto text-[11px] font-mono font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-100 shrink-0">{regisseur.score}</span>
+                        )}
+                      </div>
+                      <p className="text-[10px] text-slate-500 leading-relaxed">{regisseur.bio}</p>
+                      <button
+                        onClick={(e) => { e.stopPropagation(); setSelectedSuitableDirectorId(regisseur.id ?? null); setExpandedDirectorInDropdown(null); setShowMoreDirectors(false) }}
+                        className="w-full py-1.5 text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg transition-colors"
+                      >
+                        {isGekozen ? "Geselecteerd" : "Selecteer"}
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )
+            })}
           </div>
         </div>
       )}
