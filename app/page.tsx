@@ -501,7 +501,8 @@ export default function CanaryDashboard() {
     const movies = processedAnalytics.rankedMovies.filter((m) => m.genre === effectiveGenre)
 
     if (movies.length > 0) {
-      const totalDuration = movies.reduce((sum, m) => sum + m.durationMinutes, 0)
+      const validDurationMovies = movies.filter(m => m.durationMinutes > 0)
+      const totalDuration = validDurationMovies.reduce((sum, m) => sum + m.durationMinutes, 0)
       const validImdbMovies = movies.filter(m => m.imdbRating && !isNaN(Number(m.imdbRating)))
       const avgImdb = validImdbMovies.length > 0
         ? (validImdbMovies.reduce((sum, m) => sum + Number(m.imdbRating), 0) / validImdbMovies.length).toFixed(1)
@@ -510,7 +511,7 @@ export default function CanaryDashboard() {
       return {
         name: effectiveGenre,
         avgWinstM: exactWinstM,
-        avgDuration: Math.round(totalDuration / movies.length),
+        avgDuration: validDurationMovies.length > 0 ? Math.round(totalDuration / validDurationMovies.length) : null,
         titleCount: movies.length,
         avgImdb
       }
@@ -804,12 +805,12 @@ export default function CanaryDashboard() {
                     <p className="text-[10px] font-bold text-slate-400 uppercase font-mono tracking-wide">Gem. winst</p>
                     <p className="text-xl font-extrabold text-indigo-600 font-mono mt-0.5">€{selectedGenreSummary.avgWinstM}M</p>
                   </div>
-                  <div className="bg-white/90 border border-slate-200 rounded-2xl px-4 py-2.5 shadow-sm shrink-0">
-                    <p className="text-[10px] font-bold text-slate-400 uppercase font-mono tracking-wide">Gem. duur</p>
-                    <p className="text-xl font-extrabold text-slate-800 font-mono mt-0.5">
-                      {selectedGenreSummary.avgDuration != null ? `${selectedGenreSummary.avgDuration} min` : "—"}
-                    </p>
-                  </div>
+                  {selectedGenreSummary.avgDuration != null && (
+                    <div className="bg-white/90 border border-slate-200 rounded-2xl px-4 py-2.5 shadow-sm shrink-0">
+                      <p className="text-[10px] font-bold text-slate-400 uppercase font-mono tracking-wide">Gem. duur</p>
+                      <p className="text-xl font-extrabold text-slate-800 font-mono mt-0.5">{selectedGenreSummary.avgDuration} min</p>
+                    </div>
+                  )}
                 </>
               )}
 
