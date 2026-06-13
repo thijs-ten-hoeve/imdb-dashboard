@@ -805,12 +805,12 @@ export default function CanaryDashboard() {
                     <p className="text-[10px] font-bold text-slate-400 uppercase font-mono tracking-wide">Gem. winst</p>
                     <p className="text-xl font-extrabold text-indigo-600 font-mono mt-0.5">€{selectedGenreSummary.avgWinstM}M</p>
                   </div>
-                  {selectedGenreSummary.avgDuration != null && (
-                    <div className="bg-white/90 border border-slate-200 rounded-2xl px-4 py-2.5 shadow-sm shrink-0">
-                      <p className="text-[10px] font-bold text-slate-400 uppercase font-mono tracking-wide">Gem. duur</p>
-                      <p className="text-xl font-extrabold text-slate-800 font-mono mt-0.5">{selectedGenreSummary.avgDuration} min</p>
-                    </div>
-                  )}
+                  <div className="bg-white/90 border border-slate-200 rounded-2xl px-4 py-2.5 shadow-sm shrink-0">
+                    <p className="text-[10px] font-bold text-slate-400 uppercase font-mono tracking-wide">Gem. duur</p>
+                    <p className="text-xl font-extrabold text-slate-800 font-mono mt-0.5">
+                      {selectedGenreSummary.avgDuration != null ? `${selectedGenreSummary.avgDuration} min` : "—"}
+                    </p>
+                  </div>
                 </>
               )}
 
