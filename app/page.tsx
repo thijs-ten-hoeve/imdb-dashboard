@@ -487,14 +487,20 @@ export default function CanaryDashboard() {
   }
 
   const rankedGenres = React.useMemo(() => {
+    const maxBudgetM = budgetRange[1] / 1_000_000
     return genreStats
-      .map((genre) => ({
-        name: genre.name,
-        titleCount: genre.titleCount,
-        value: Math.round((genre.avgNetProfit / 1_000_000) * 10) / 10,
-      }))
-      .sort((a, b) => b.value - a.value)
-  }, [genreStats])
+      .map((genre) => {
+        const ratio = Math.min(genre.avgRevBudgetRatio ?? 1, 2.5)
+        const winstM = Math.round(maxBudgetM * (ratio - 1) * 10) / 10
+        return {
+          name: genre.name,
+          titleCount: genre.titleCount,
+          value: Math.round((genre.avgNetProfit / 1_000_000) * 10) / 10,
+          winstM,
+        }
+      })
+      .sort((a, b) => b.winstM - a.winstM)
+  }, [genreStats, budgetRange])
 
   const processedAnalytics = React.useMemo(() => {
     const verifiedCatalog = masterCatalog.map(item => {
@@ -749,7 +755,7 @@ export default function CanaryDashboard() {
                 >
                   <span className="block truncate">{genreNl(genreItem.name)}</span>
                   <span className={`text-[11px] font-mono block mt-1 ${isSelected ? 'text-amber-600 font-bold' : 'text-slate-400'}`}>
-                    {genreItem.titleCount > 0 ? `€${genreItem.value.toFixed(1)}M gem.` : "—"}
+                    {genreItem.titleCount > 0 ? `€${genreItem.winstM.toFixed(1)}M winst` : "—"}
                   </span>
                 </button>
               )
