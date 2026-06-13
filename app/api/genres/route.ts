@@ -1,9 +1,16 @@
-import { NextResponse } from 'next/server';
-import { fetchGenreStats } from '@/lib/genre-stats';
+import { NextRequest, NextResponse } from 'next/server';
+import { fetchGenreStats, fetchGenreStatsForRange } from '@/lib/genre-stats';
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
-    const genreStats = await fetchGenreStats();
+    const searchParams = request.nextUrl.searchParams;
+    const startYear = searchParams.get('startYear');
+    const endYear = searchParams.get('endYear');
+
+    const genreStats = startYear && endYear
+      ? await fetchGenreStatsForRange(parseInt(startYear, 10), parseInt(endYear, 10))
+      : await fetchGenreStats();
+
     return NextResponse.json(genreStats);
   } catch (error) {
     console.error('Database error:', error);

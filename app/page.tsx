@@ -200,9 +200,13 @@ export default function CanaryDashboard() {
   const popupRef = React.useRef<HTMLDivElement>(null)
 
   React.useEffect(() => {
-    async function fetchGenres() {
+    const delayDebounceFn = setTimeout(async () => {
       try {
-        const genresRes = await fetch('/api/genres');
+        const url = new URL('/api/genres', window.location.origin);
+        url.searchParams.set('startYear', yearRange[0].toString());
+        url.searchParams.set('endYear', yearRange[1].toString());
+
+        const genresRes = await fetch(url.toString());
         if (genresRes.ok) {
           setGenreStats(await genresRes.json());
         }
@@ -211,9 +215,10 @@ export default function CanaryDashboard() {
       } finally {
         setIsInitialLoading(false);
       }
-    }
-    fetchGenres();
-  }, []);
+    }, 400);
+
+    return () => clearTimeout(delayDebounceFn);
+  }, [yearRange]);
 
   React.useEffect(() => {
     async function fetchActors() {
@@ -644,7 +649,7 @@ export default function CanaryDashboard() {
         <div className="space-y-4 pt-2">
           <div className="space-y-3 bg-slate-50/50 p-4 rounded-2xl border border-slate-200/60 shadow-sm transition-all hover:border-slate-300/80">
             <label className="text-[11px] font-bold text-slate-700 uppercase flex items-center gap-1.5">
-              <DollarSign size={14} className="text-amber-500" /> Budget
+              <DollarSign size={14} className="text-amber-500" /> Investeringsbudget
             </label>
             <div className="flex items-center gap-2">
               {([
