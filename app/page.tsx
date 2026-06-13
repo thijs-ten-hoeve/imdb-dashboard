@@ -1084,22 +1084,24 @@ export default function CanaryDashboard() {
                             >
                               {movie.title}
                             </a>
-                            <div className="flex items-center gap-2 mt-1.5 flex-wrap text-[11px] font-mono text-slate-500">
-                              <span className="font-sans font-bold text-indigo-800 bg-indigo-100/50 px-2 py-0.5 rounded-md border border-indigo-100">{genreNl(movie.genre)}</span>
+                            <div className="flex items-center gap-1.5 mt-1.5 flex-wrap">
+                              <span className="text-[11px] font-bold text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded-md border border-indigo-200">{genreNl(movie.genre)}</span>
+                              <span className="text-[11px] text-slate-400 font-mono">{movie.year}</span>
+                              <span className="text-[11px] text-slate-400">·</span>
+                              <span className="text-[11px] text-slate-400 font-mono flex items-center gap-0.5"><Clock size={9} /> {movie.durationMinutes} min</span>
                               {liveImdbRating && (
                                 <a
                                   href={`https://www.imdb.com/title/${movie.id}/`}
                                   target="_blank"
                                   rel="noopener noreferrer"
-                                  className="flex items-center"
+                                  className="flex items-center gap-1 ml-0.5"
                                 >
                                   <span style={{ background: '#F5C518', fontFamily: '"Arial Black", Arial, sans-serif', letterSpacing: '-0.2px' }} className="inline-block text-black font-black text-[10px] leading-none px-1 py-[2px] rounded-[3px]">
-                                    IMDb {liveImdbRating}
+                                    IMDb
                                   </span>
+                                  <span className="text-[11px] font-bold text-slate-700">{liveImdbRating}</span>
                                 </a>
                               )}
-                              <span className="font-semibold text-slate-600">{movie.year}</span>
-                              <span className="flex items-center gap-1 font-semibold text-slate-600"><Clock size={10} /> {movie.durationMinutes} min</span>
                             </div>
                           </div>
                         </div>
