@@ -5,7 +5,7 @@ import Image from "next/image"
 import {
   Calendar, Layers, DollarSign, Clapperboard, Clock,
   UserCheck, Search, X, Check, ChevronDown, Star, ExternalLink,
-  ArrowUp, ArrowDown, ArrowUpDown, TrendingUp, Info, Pencil
+  ArrowUp, ArrowDown, ArrowUpDown, TrendingUp, Info, Pencil, RefreshCw
 } from "lucide-react"
 
 import {
@@ -157,8 +157,10 @@ export default function CanaryDashboard() {
   const [selectedSuitableDirectorId, setSelectedSuitableDirectorId] = React.useState<string | null>(null)
   
   // Laad States
-  const [isInitialLoading, setIsInitialLoading] = React.useState(true) 
-  const [isFiltering, setIsFiltering] = React.useState(false) 
+  const [isInitialLoading, setIsInitialLoading] = React.useState(true)
+  const [isFiltering, setIsFiltering] = React.useState(false)
+  const [lastUpdated, setLastUpdated] = React.useState<Date | null>(null)
+  const [refreshKey, setRefreshKey] = React.useState(0)
 
   // Filter State
   const [productionType, setProductionType] = React.useState<string>("all")
@@ -221,6 +223,7 @@ export default function CanaryDashboard() {
         const genresRes = await fetch(url.toString());
         if (genresRes.ok) {
           setGenreStats(await genresRes.json());
+          setLastUpdated(new Date());
         }
       } catch (error) {
         console.error("Fout bij ophalen genres:", error);
@@ -230,7 +233,7 @@ export default function CanaryDashboard() {
     }, 400);
 
     return () => clearTimeout(delayDebounceFn);
-  }, [yearRange]);
+  }, [yearRange, refreshKey]);
 
   React.useEffect(() => {
     let cancelled = false;
@@ -280,7 +283,7 @@ export default function CanaryDashboard() {
 
     fetchActorsAndDirector();
     return () => { cancelled = true; };
-  }, [selectedGenre, yearRange, budgetRange]);
+  }, [selectedGenre, yearRange, budgetRange, refreshKey]);
 
   React.useEffect(() => {
     const query = actorSearchQuery.trim();
@@ -765,6 +768,26 @@ export default function CanaryDashboard() {
                 setYearRange(val)
               }} min={1970} max={2026} step={1} className="cursor-grab" />
           </div>
+        </div>
+
+        {/* Laatste update */}
+        <div className="mt-auto pt-4 border-t border-slate-100 flex items-center justify-between">
+          <div>
+            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Laatste update</p>
+            <p className="text-[11px] font-mono text-slate-500 mt-0.5">
+              {lastUpdated
+                ? lastUpdated.toLocaleTimeString('nl-NL', { hour: '2-digit', minute: '2-digit' }) + ' ' +
+                  lastUpdated.toLocaleDateString('nl-NL', { weekday: 'short' })
+                : '—'}
+            </p>
+          </div>
+          <button
+            onClick={() => setRefreshKey(k => k + 1)}
+            title="Ververs data"
+            className="p-2 rounded-lg border border-slate-200 text-slate-400 hover:text-indigo-600 hover:border-indigo-300 hover:bg-indigo-50 transition-colors"
+          >
+            <RefreshCw size={13} />
+          </button>
         </div>
       </aside>
 
