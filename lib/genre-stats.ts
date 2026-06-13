@@ -8,6 +8,7 @@ export type GenreStatRow = {
   avgNetProfit: number;
   avgMarginPct: number;
   avgDuration: number | null;
+  avgRevBudgetRatio: number | null;
 };
 
 export function getDbConfig() {
@@ -122,13 +123,16 @@ export async function fetchGenreStatsForRange(
           COUNT(DISTINCT bt.title_id) AS title_count,
           AVG(bt.net_profit) AS avg_net_profit,
           AVG(bt.margin_pct) AS avg_margin_pct,
-          AVG(bt.runtime_minutes) AS avg_duration
+          AVG(bt.runtime_minutes) AS avg_duration,
+          AVG(CASE WHEN bt.revenue > 0 THEN bt.revenue / bt.budget ELSE NULL END) AS avg_rev_budget_ratio
         FROM genre g2
         JOIN title_genre tg ON g2.genre_id = tg.genre_id
         JOIN (
           SELECT
             t.title_id,
             t.runtime_minutes,
+            f.budget,
+            f.revenue,
             ROUND(COALESCE(tr.average_rating / 10, 0.5) * 100) AS margin_pct,
             ROUND(f.budget * (1 + ROUND(COALESCE(tr.average_rating / 10, 0.5) * 100) / 100)) - f.budget AS net_profit
           FROM title t
@@ -148,6 +152,7 @@ export async function fetchGenreStatsForRange(
       avgNetProfit: Number(row.avgNetProfit ?? 0),
       avgMarginPct: Number(row.avgMarginPct ?? 0),
       avgDuration: row.avgDuration != null ? Math.round(Number(row.avgDuration)) : null,
+      avgRevBudgetRatio: row.avg_rev_budget_ratio != null ? Number(row.avg_rev_budget_ratio) : null,
     }));
   } finally {
     if (shouldClose) {
@@ -169,11 +174,15 @@ export async function fetchGenreStats(connection?: mysql.Connection): Promise<Ge
         gs.title_count AS titleCount,
         gs.avg_net_profit AS avgNetProfit,
         gs.avg_margin_pct AS avgMarginPct,
-        dur.avg_duration AS avgDuration
+        dur.avg_duration AS avgDuration,
+        dur.avg_rev_budget_ratio AS avgRevBudgetRatio
       FROM genre g
       LEFT JOIN genre_stats gs ON gs.genre_id = g.genre_id
       LEFT JOIN (
-        SELECT tg.genre_id, AVG(t.runtime_minutes) AS avg_duration
+        SELECT
+          tg.genre_id,
+          AVG(t.runtime_minutes) AS avg_duration,
+          AVG(CASE WHEN f.revenue > 0 THEN f.revenue / f.budget ELSE NULL END) AS avg_rev_budget_ratio
         FROM title_genre tg
         JOIN title t ON tg.title_id = t.title_id
         JOIN title_financials f ON t.title_id = f.title_id AND f.budget >= ?
@@ -189,6 +198,7 @@ export async function fetchGenreStats(connection?: mysql.Connection): Promise<Ge
       avgNetProfit: Number(row.avgNetProfit ?? 0),
       avgMarginPct: Number(row.avgMarginPct ?? 0),
       avgDuration: row.avgDuration != null ? Math.round(Number(row.avgDuration)) : null,
+      avgRevBudgetRatio: row.avgRevBudgetRatio != null ? Number(row.avgRevBudgetRatio) : null,
     }));
   } finally {
     if (shouldClose) {

@@ -123,6 +123,7 @@ interface GenreInfo {
   avgNetProfit: number
   avgMarginPct: number
   avgDuration: number | null
+  avgRevBudgetRatio: number | null
 }
 
 function formatBudget(value: number): string {
@@ -527,12 +528,14 @@ export default function CanaryDashboard() {
     // Gewogen statistieken (gewogen naar titleCount per genre)
     const totalTitles = matchingStats.reduce((sum, s) => sum + s.titleCount, 0)
 
-    const baseWinstM = Math.round(
-      (matchingStats.reduce((sum, s) => {
-        const winstM = rankedGenres.find(r => r.name === s.name)?.value ?? 0
-        return sum + winstM * s.titleCount
-      }, 0) / totalTitles) * 10
-    ) / 10
+    // Gebruik echte revenue/budget ratio uit de database
+    const ratioStats = matchingStats.filter(s => s.avgRevBudgetRatio != null)
+    const ratioTitles = ratioStats.reduce((sum, s) => sum + s.titleCount, 0)
+    const weightedRatio = ratioTitles > 0
+      ? ratioStats.reduce((sum, s) => sum + s.avgRevBudgetRatio! * s.titleCount, 0) / ratioTitles
+      : 1.5 // fallback: 50% winst als er geen ratio-data is
+    const maxBudgetM = budgetRange[1] / 1_000_000
+    const baseWinstM = Math.round(maxBudgetM * (weightedRatio - 1) * 10) / 10
 
     // Risicokorting: elk genre boven de 2 kost 10% winst (max 50%)
     const extraGenres = Math.max(0, effectiveGenres.length - 2)
@@ -556,7 +559,7 @@ export default function CanaryDashboard() {
       avgDuration,
       titleCount: totalTitles,
     }
-  }, [selectedGenres, searchedSuitableActor, genreStats, rankedGenres])
+  }, [selectedGenres, searchedSuitableActor, genreStats, rankedGenres, budgetRange])
 
   const displayedMovies = React.useMemo(() => {
     const query = filmSearchQuery.toLowerCase().trim()
