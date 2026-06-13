@@ -4,7 +4,7 @@ import { Inter, JetBrains_Mono } from "next/font/google"
 import Image from "next/image"
 import {
   Calendar, Layers, DollarSign, Clapperboard, Clock,
-  UserCheck, Users, Search, X, Play, Check, Plus, ChevronDown, ChevronUp, Star, ExternalLink, Film,
+  UserCheck, Users, Search, X, Check, Plus, ChevronDown, ChevronUp, Star, ExternalLink,
   ArrowUp, ArrowDown, ArrowUpDown, TrendingUp, Info
 } from "lucide-react"
 
@@ -183,7 +183,6 @@ export default function CanaryDashboard() {
   const [actorMovies, setActorMovies] = React.useState<any[]>([])
   const [isActorMoviesLoading, setIsActorMoviesLoading] = React.useState(false)
   const [expandedMovieId, setExpandedMovieId] = React.useState<string | null>(null)
-  const [trailerUrl, setTrailerUrl] = React.useState<string | null>(null)
 
   const [popupContent, setPopupContent] = React.useState<{
     type: "actor" | "director"
@@ -536,11 +535,6 @@ export default function CanaryDashboard() {
 
   const toggleMovieExpand = (movieId: string) => {
     setExpandedMovieId(expandedMovieId === movieId ? null : movieId)
-  }
-
-  const openTrailerPopup = (e: React.MouseEvent) => {
-    e.stopPropagation()
-    setTrailerUrl("https://www.youtube.com/embed/aqz-KE-bpKQ")
   }
 
   // Generate chart data formatting
@@ -1043,7 +1037,10 @@ export default function CanaryDashboard() {
 
                   return (
                     <div key={movie.id} className={`p-4 rounded-2xl border transition-all duration-300 flex flex-col gap-4 group ${movie.genre === selectedGenre ? "border-indigo-200/60 bg-indigo-50/30 hover:border-indigo-300" : "border-slate-200/60 bg-white hover:border-slate-300 hover:shadow-md hover:-translate-y-0.5"}`}>
-                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                      <div
+                        onClick={() => toggleMovieExpand(movie.id)}
+                        className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 cursor-pointer"
+                      >
                         <div className="flex gap-4 truncate items-start">
                           <span className="text-xs font-bold text-slate-400 font-mono pt-1 min-w-[24px]">#{index + 1}</span>
                           <div className="truncate">
@@ -1068,10 +1065,9 @@ export default function CanaryDashboard() {
                               </span>
                             </div>
                           </div>
-                          <button onClick={() => toggleMovieExpand(movie.id)} className={`h-9 px-4 rounded-xl border text-xs font-bold flex items-center gap-1.5 transition-all shadow-sm ${isExpanded ? "bg-indigo-950 border-indigo-950 text-white" : "bg-white border-slate-200 text-slate-700 hover:bg-slate-50"}`}>
+                          <div className={`h-9 w-9 rounded-xl border flex items-center justify-center shrink-0 transition-all shadow-sm ${isExpanded ? "bg-indigo-950 border-indigo-950 text-white" : "bg-white border-slate-200 text-slate-700 group-hover:bg-slate-50"}`}>
                             {isExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
-                            {isExpanded ? 'Sluiten' : 'Details'}
-                          </button>
+                          </div>
                         </div>
                       </div>
                       
@@ -1079,10 +1075,7 @@ export default function CanaryDashboard() {
                       {isExpanded && (
                         <div className="bg-slate-900 border border-indigo-950 rounded-2xl p-5 mt-2 space-y-4 text-xs text-slate-300 animate-in slide-in-from-top-2 fade-in shadow-inner">
                            <div className="flex items-center gap-3 border-b border-slate-700 pb-4 flex-wrap">
-                            <button onClick={(e) => openTrailerPopup(e)} className="h-9 px-4 rounded-xl bg-indigo-500 hover:bg-indigo-400 text-white font-extrabold flex items-center gap-2 shadow-sm shadow-indigo-500/20 active:scale-95 border border-indigo-500 transition-colors">
-                              <Play size={14} className="fill-current" /> Bekijk Trailer
-                            </button>
-                            <a href={`https://www.imdb.com/find?q=${encodeURIComponent(movie.title)}`} target="_blank" rel="noopener noreferrer" className="h-9 px-4 rounded-xl bg-slate-800 border border-slate-700 text-slate-200 hover:bg-slate-700 hover:text-white font-bold flex items-center gap-2 shadow-sm active:scale-95 transition-colors">
+                            <a href={`https://www.imdb.com/find?q=${encodeURIComponent(movie.title)}`} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()} className="h-9 px-4 rounded-xl bg-slate-800 border border-slate-700 text-slate-200 hover:bg-slate-700 hover:text-white font-bold flex items-center gap-2 shadow-sm active:scale-95 transition-colors">
                               <ExternalLink size={14} /> IMDb Pagina
                             </a>
                            </div>
@@ -1184,20 +1177,6 @@ export default function CanaryDashboard() {
                </button>
              </div>
            )}
-        </div>
-      )}
-
-      {trailerUrl && (
-        <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-6 z-50 animate-in fade-in">
-          <div className="bg-slate-950 rounded-3xl max-w-3xl w-full border border-indigo-900/80 shadow-2xl overflow-hidden relative flex flex-col scale-in-95 animate-in">
-            <div className="p-4 bg-slate-900/50 border-b border-indigo-900/50 flex items-center justify-between text-white backdrop-blur-md absolute top-0 w-full z-10">
-              <div className="text-xs font-extrabold text-indigo-400 flex items-center gap-2"><Film size={16} /> STUDIO MEDIA STREAM</div>
-              <button onClick={() => setTrailerUrl(null)} className="bg-slate-800 hover:bg-red-500 p-2 rounded-full transition-colors"><X size={16} strokeWidth={2.5} /></button>
-            </div>
-            <div className="relative aspect-[16/9] w-full bg-black pt-[60px]">
-              <iframe src={trailerUrl} allowFullScreen className="absolute inset-0 w-full h-full border-none" />
-            </div>
-          </div>
         </div>
       )}
     </div>
