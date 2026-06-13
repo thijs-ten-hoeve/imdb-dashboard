@@ -115,7 +115,8 @@ export async function fetchGenreStatsForRange(
         COALESCE(stats.title_count, 0) AS titleCount,
         COALESCE(stats.avg_net_profit, 0) AS avgNetProfit,
         COALESCE(stats.avg_margin_pct, 0) AS avgMarginPct,
-        stats.avg_duration AS avgDuration
+        stats.avg_duration AS avgDuration,
+        stats.avg_rev_budget_ratio AS avg_rev_budget_ratio
       FROM genre g
       LEFT JOIN (
         SELECT
