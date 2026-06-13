@@ -783,7 +783,7 @@ export default function CanaryDashboard() {
       {/* 2. Rechter Canvas voor Inhoud */}
       <section className="flex-1 p-6 lg:p-8 space-y-8 overflow-y-auto max-w-full w-full z-10 scrollbar-thin scrollbar-thumb-slate-200 scrollbar-track-transparent">
         
-        {(selectedGenreSummary || searchedSuitableActor) && (
+        {(selectedGenreSummary || searchedSuitableActor || geselecteerdeActeur) && (
           <div className="bg-gradient-to-br from-indigo-50/80 via-white to-slate-50 border border-indigo-200/80 p-6 rounded-3xl shadow-sm flex flex-col xl:flex-row xl:items-center justify-between gap-6">
             {selectedGenreSummary && (
               <div className="flex flex-col gap-4">
