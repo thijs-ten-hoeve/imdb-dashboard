@@ -524,14 +524,20 @@ export default function CanaryDashboard() {
 
     if (matchingStats.length === 0) return null
 
-    // Gecombineerde statistieken over alle geselecteerde genres
+    // Gewogen statistieken (gewogen naar titleCount per genre)
     const totalTitles = matchingStats.reduce((sum, s) => sum + s.titleCount, 0)
+
     const avgWinstM = Math.round(
-      (matchingStats.reduce((sum, s) => sum + (rankedGenres.find(r => r.name === s.name)?.value ?? 0), 0) / matchingStats.length) * 10
+      (matchingStats.reduce((sum, s) => {
+        const winstM = rankedGenres.find(r => r.name === s.name)?.value ?? 0
+        return sum + winstM * s.titleCount
+      }, 0) / totalTitles) * 10
     ) / 10
+
     const durStats = matchingStats.filter(s => s.avgDuration != null)
-    const avgDuration = durStats.length > 0
-      ? Math.round(durStats.reduce((sum, s) => sum + s.avgDuration!, 0) / durStats.length)
+    const durTitles = durStats.reduce((sum, s) => sum + s.titleCount, 0)
+    const avgDuration = durTitles > 0
+      ? Math.round(durStats.reduce((sum, s) => sum + s.avgDuration! * s.titleCount, 0) / durTitles)
       : null
 
     const label = effectiveGenres.length === 1
