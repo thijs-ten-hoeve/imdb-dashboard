@@ -708,12 +708,12 @@ export default function CanaryDashboard() {
                   onClick={() => handleGenreChange(isSelected ? null : genreItem.name)}
                   className={`p-3 rounded-xl text-xs text-center transition-all duration-300 active:scale-95 border ${
                     isSelected
-                      ? "bg-gradient-to-b from-amber-400 to-amber-500 border-amber-400 text-white font-bold shadow-md shadow-amber-400/30 ring-2 ring-amber-300/40"
-                      : "bg-white border-slate-200 text-slate-600 hover:border-amber-300 hover:shadow-sm hover:text-amber-800"
+                      ? "bg-amber-50 border-amber-300 text-amber-900 font-bold shadow-sm"
+                      : "bg-white border-slate-200 text-slate-600 hover:border-amber-200 hover:shadow-sm hover:text-slate-800"
                   }`}
                 >
                   <span className="block truncate">{genreNl(genreItem.name)}</span>
-                  <span className={`text-[11px] font-mono block mt-1 ${isSelected ? 'text-amber-100 font-bold' : 'text-slate-400'}`}>
+                  <span className={`text-[11px] font-mono block mt-1 ${isSelected ? 'text-amber-600 font-bold' : 'text-slate-400'}`}>
                     {genreItem.titleCount > 0 ? `€${genreItem.value.toFixed(1)}M gem.` : "—"}
                   </span>
                 </button>
