@@ -125,6 +125,7 @@ interface GenreInfo {
   avgDuration: number | null
   avgRevBudgetRatio: number | null
   revenueCoverage: number | null
+  maxBudget: number | null
 }
 
 function formatBudget(value: number): string {
@@ -170,7 +171,6 @@ export default function CanaryDashboard() {
   const [budgetRange, setBudgetRange] = React.useState<[number, number]>([1_000_000, 1_000_000_000])
   const [budgetCeiling, setBudgetCeiling] = React.useState<number>(1_000_000_000)
   const [budgetInputMax, setBudgetInputMax] = React.useState<string>(formatBudget(1_000_000_000))
-  const prevCatalogKey = React.useRef<string>('')
   const [yearRange, setYearRange] = React.useState<number[]>([1970, 2026])
   const [filmSearchQuery, setFilmSearchQuery] = React.useState<string>("")
   const [sortField, setSortField] = React.useState<SortField>("winst")
@@ -236,6 +236,22 @@ export default function CanaryDashboard() {
 
     return () => clearTimeout(delayDebounceFn);
   }, [yearRange, refreshKey]);
+
+  // Pas het budget-plafond aan op het werkelijke max-budget van de geselecteerde genres.
+  // Geen genre geselecteerd → plafond = hoogste max-budget over alle genres.
+  // Hierdoor springt de slider betrouwbaar mee zodra je een genre aanklikt.
+  React.useEffect(() => {
+    if (genreStats.length === 0) return;
+    const pool = selectedGenres.length > 0
+      ? genreStats.filter(s => selectedGenres.includes(s.name))
+      : genreStats;
+    const ceiling = Math.max(...pool.map(s => s.maxBudget ?? 0), 0);
+    if (ceiling > 0) {
+      setBudgetCeiling(ceiling);
+      setBudgetRange([1_000_000, ceiling]);
+      setBudgetInputMax(formatBudget(ceiling));
+    }
+  }, [selectedGenres, genreStats]);
 
   React.useEffect(() => {
     let cancelled = false;
@@ -342,19 +358,6 @@ export default function CanaryDashboard() {
         }));
         setMasterCatalog(cleanMovies);
 
-        const catalogKey = `${selectedGenres.join(',') || 'all'}-${yearRange[0]}-${yearRange[1]}`;
-        if (prevCatalogKey.current !== catalogKey) {
-          prevCatalogKey.current = catalogKey;
-          const top = [...cleanMovies].sort((a: any, b: any) =>
-            (b.baseMarginFactor * b.budget) - (a.baseMarginFactor * a.budget)
-          )[0];
-          if (top?.budget > 0) {
-            setBudgetCeiling(top.budget);
-            setBudgetRange([1_000_000, top.budget]);
-            setBudgetInputMax(formatBudget(top.budget));
-          }
-        }
-
       } catch (error) {
         console.error("Fout bij ophalen catalogus:", error);
       } finally {
@@ -457,9 +460,7 @@ export default function CanaryDashboard() {
   }
 
   const handleGenreReset = () => {
-    setBudgetRange([1_000_000, 1_000_000_000])
-    setBudgetCeiling(1_000_000_000)
-    setBudgetInputMax(formatBudget(1_000_000_000))
+    // budget-plafond wordt door het genre-effect hersteld naar het globale max
     setSelectedGenres([])
     setPopupContent(null)
     setShowMoreActors(false)
@@ -500,9 +501,13 @@ export default function CanaryDashboard() {
 
     return genreStats
       .map((genre) => {
+        // Cap budget op het werkelijke max-budget van dit genre in de database:
+        // een Sport-film kreeg nooit meer dan ~107M, dus winst op 500M is onrealistisch
+        const genreMaxBudgetM = genre.maxBudget != null ? genre.maxBudget / 1_000_000 : maxBudgetM
+        const effectiveBudgetM = Math.min(maxBudgetM, genreMaxBudgetM)
         // Winst relatief aan het genre-gemiddelde: beter dan gemiddeld genre = meer winst
         const ratio = genre.avgRevBudgetRatio ?? globalRatio
-        const winstM = Math.round(maxBudgetM * BASE_PROFIT * (ratio / globalRatio) * 10) / 10
+        const winstM = Math.round(effectiveBudgetM * BASE_PROFIT * (ratio / globalRatio) * 10) / 10
         return {
           name: genre.name,
           titleCount: genre.titleCount,
@@ -561,7 +566,14 @@ export default function CanaryDashboard() {
       ? ratioStats.reduce((sum, s) => sum + s.avgRevBudgetRatio! * s.titleCount, 0) / ratioTitles
       : globalRatio
 
-    const maxBudgetM = budgetRange[1] / 1_000_000
+    // Cap budget op het hoogste werkelijke max-budget van de geselecteerde genres
+    // (OR-filter: een film kan in elk gekozen genre vallen, dus neem de hoogste max)
+    const genreMaxBudgetM = Math.max(
+      ...matchingStats.map(s => s.maxBudget != null ? s.maxBudget / 1_000_000 : 0)
+    )
+    const maxBudgetM = genreMaxBudgetM > 0
+      ? Math.min(budgetRange[1] / 1_000_000, genreMaxBudgetM)
+      : budgetRange[1] / 1_000_000
     const BASE_PROFIT = 0.15 // gemiddeld genre geeft 15% winst op max budget
     const baseWinstM = Math.round(maxBudgetM * BASE_PROFIT * (selectedRatio / globalRatio) * 10) / 10
 
@@ -830,9 +842,8 @@ export default function CanaryDashboard() {
               </span>
             </div>
             <Slider value={yearRange} onValueChange={(val) => {
-                setBudgetRange([1_000_000, 1_000_000_000])
-                setBudgetCeiling(1_000_000_000)
-                setBudgetInputMax(formatBudget(1_000_000_000))
+                // budget-plafond wordt door het genre-effect herberekend zodra de
+                // nieuwe genre-stats voor deze periode binnen zijn
                 setYearRange(val)
               }} min={1970} max={2026} step={1} className="cursor-grab" />
           </div>

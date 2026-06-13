@@ -10,6 +10,7 @@ export type GenreStatRow = {
   avgDuration: number | null;
   avgRevBudgetRatio: number | null;
   revenueCoverage: number | null;
+  maxBudget: number | null;
 };
 
 export function getDbConfig() {
@@ -118,7 +119,8 @@ export async function fetchGenreStatsForRange(
         COALESCE(stats.avg_margin_pct, 0) AS avgMarginPct,
         stats.avg_duration AS avgDuration,
         stats.avg_rev_budget_ratio AS avg_rev_budget_ratio,
-        stats.revenue_coverage AS revenue_coverage
+        stats.revenue_coverage AS revenue_coverage,
+        stats.max_budget AS max_budget
       FROM genre g
       LEFT JOIN (
         SELECT
@@ -128,7 +130,8 @@ export async function fetchGenreStatsForRange(
           AVG(bt.margin_pct) AS avg_margin_pct,
           AVG(bt.runtime_minutes) AS avg_duration,
           AVG(CASE WHEN bt.revenue > 0 THEN bt.revenue / bt.budget ELSE NULL END) AS avg_rev_budget_ratio,
-          COUNT(CASE WHEN bt.revenue > 0 THEN 1 END) * 1.0 / COUNT(*) AS revenue_coverage
+          COUNT(CASE WHEN bt.revenue > 0 THEN 1 END) * 1.0 / COUNT(*) AS revenue_coverage,
+          MAX(bt.budget) AS max_budget
         FROM genre g2
         JOIN title_genre tg ON g2.genre_id = tg.genre_id
         JOIN (
@@ -158,6 +161,7 @@ export async function fetchGenreStatsForRange(
       avgDuration: row.avgDuration != null ? Math.round(Number(row.avgDuration)) : null,
       avgRevBudgetRatio: row.avg_rev_budget_ratio != null ? Number(row.avg_rev_budget_ratio) : null,
       revenueCoverage: row.revenue_coverage != null ? Number(row.revenue_coverage) : null,
+      maxBudget: row.max_budget != null ? Number(row.max_budget) : null,
     }));
   } finally {
     if (shouldClose) {
@@ -181,7 +185,8 @@ export async function fetchGenreStats(connection?: mysql.Connection): Promise<Ge
         gs.avg_margin_pct AS avgMarginPct,
         dur.avg_duration AS avgDuration,
         dur.avg_rev_budget_ratio AS avgRevBudgetRatio,
-        dur.revenue_coverage AS revenueCoverage
+        dur.revenue_coverage AS revenueCoverage,
+        dur.max_budget AS maxBudget
       FROM genre g
       LEFT JOIN genre_stats gs ON gs.genre_id = g.genre_id
       LEFT JOIN (
@@ -189,7 +194,8 @@ export async function fetchGenreStats(connection?: mysql.Connection): Promise<Ge
           tg.genre_id,
           AVG(t.runtime_minutes) AS avg_duration,
           AVG(CASE WHEN f.revenue > 0 THEN f.revenue / f.budget ELSE NULL END) AS avg_rev_budget_ratio,
-          COUNT(CASE WHEN f.revenue > 0 THEN 1 END) * 1.0 / COUNT(*) AS revenue_coverage
+          COUNT(CASE WHEN f.revenue > 0 THEN 1 END) * 1.0 / COUNT(*) AS revenue_coverage,
+          MAX(f.budget) AS max_budget
         FROM title_genre tg
         JOIN title t ON tg.title_id = t.title_id
         JOIN title_financials f ON t.title_id = f.title_id AND f.budget >= ?
@@ -207,6 +213,7 @@ export async function fetchGenreStats(connection?: mysql.Connection): Promise<Ge
       avgDuration: row.avgDuration != null ? Math.round(Number(row.avgDuration)) : null,
       avgRevBudgetRatio: row.avgRevBudgetRatio != null ? Number(row.avgRevBudgetRatio) : null,
       revenueCoverage: row.revenueCoverage != null ? Number(row.revenueCoverage) : null,
+      maxBudget: row.maxBudget != null ? Number(row.maxBudget) : null,
     }));
   } finally {
     if (shouldClose) {
