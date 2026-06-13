@@ -122,6 +122,7 @@ interface GenreInfo {
   titleCount: number
   avgNetProfit: number
   avgMarginPct: number
+  avgDuration: number | null
 }
 
 function formatBudget(value: number): string {
@@ -498,34 +499,22 @@ export default function CanaryDashboard() {
     const matchedRankedGenre = rankedGenres.find((g) => g.name === effectiveGenre)
     const exactWinstM = matchedRankedGenre ? matchedRankedGenre.value : 0
 
+    const stat = genreStats.find((g) => g.name === effectiveGenre)
     const movies = processedAnalytics.rankedMovies.filter((m) => m.genre === effectiveGenre)
 
-    if (movies.length > 0) {
-      const validDurationMovies = movies.filter(m => m.durationMinutes > 0)
-      const totalDuration = validDurationMovies.reduce((sum, m) => sum + m.durationMinutes, 0)
-      const validImdbMovies = movies.filter(m => m.imdbRating && !isNaN(Number(m.imdbRating)))
-      const avgImdb = validImdbMovies.length > 0
-        ? (validImdbMovies.reduce((sum, m) => sum + Number(m.imdbRating), 0) / validImdbMovies.length).toFixed(1)
-        : "N/A"
+    const validImdbMovies = movies.filter(m => m.imdbRating && !isNaN(Number(m.imdbRating)))
+    const avgImdb = validImdbMovies.length > 0
+      ? (validImdbMovies.reduce((sum, m) => sum + Number(m.imdbRating), 0) / validImdbMovies.length).toFixed(1)
+      : "N/A"
 
-      return {
-        name: effectiveGenre,
-        avgWinstM: exactWinstM,
-        avgDuration: validDurationMovies.length > 0 ? Math.round(totalDuration / validDurationMovies.length) : null,
-        titleCount: movies.length,
-        avgImdb
-      }
-    }
-
-    const stat = genreStats.find((g) => g.name === effectiveGenre)
     if (!stat || stat.titleCount === 0) return null
 
     return {
       name: effectiveGenre,
       avgWinstM: exactWinstM,
-      avgDuration: null,
+      avgDuration: stat.avgDuration,
       titleCount: stat.titleCount,
-      avgImdb: "N/A"
+      avgImdb
     }
   }, [selectedGenre, searchedSuitableActor, processedAnalytics.rankedMovies, genreStats, rankedGenres])
 

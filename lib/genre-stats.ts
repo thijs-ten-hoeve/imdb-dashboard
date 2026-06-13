@@ -7,6 +7,7 @@ export type GenreStatRow = {
   titleCount: number;
   avgNetProfit: number;
   avgMarginPct: number;
+  avgDuration: number | null;
 };
 
 export function getDbConfig() {
@@ -112,25 +113,28 @@ export async function fetchGenreStatsForRange(
         g.genre_name AS name,
         COALESCE(stats.title_count, 0) AS titleCount,
         COALESCE(stats.avg_net_profit, 0) AS avgNetProfit,
-        COALESCE(stats.avg_margin_pct, 0) AS avgMarginPct
+        COALESCE(stats.avg_margin_pct, 0) AS avgMarginPct,
+        stats.avg_duration AS avgDuration
       FROM genre g
       LEFT JOIN (
         SELECT
           g2.genre_id,
           COUNT(DISTINCT bt.title_id) AS title_count,
           AVG(bt.net_profit) AS avg_net_profit,
-          AVG(bt.margin_pct) AS avg_margin_pct
+          AVG(bt.margin_pct) AS avg_margin_pct,
+          AVG(bt.runtime_minutes) AS avg_duration
         FROM genre g2
         JOIN title_genre tg ON g2.genre_id = tg.genre_id
         JOIN (
           SELECT
             t.title_id,
+            t.runtime_minutes,
             ROUND(COALESCE(tr.average_rating / 10, 0.5) * 100) AS margin_pct,
             ROUND(f.budget * (1 + ROUND(COALESCE(tr.average_rating / 10, 0.5) * 100) / 100)) - f.budget AS net_profit
           FROM title t
           JOIN title_financials f ON t.title_id = f.title_id AND f.budget >= ?
           LEFT JOIN title_rating tr ON t.title_id = tr.title_id
-          WHERE t.runtime_minutes IS NOT NULL
+          WHERE t.runtime_minutes IS NOT NULL AND t.runtime_minutes > 0
             AND t.start_year >= ? AND t.start_year <= ?
         ) bt ON bt.title_id = tg.title_id
         GROUP BY g2.genre_id
@@ -143,6 +147,7 @@ export async function fetchGenreStatsForRange(
       titleCount: Number(row.titleCount ?? 0),
       avgNetProfit: Number(row.avgNetProfit ?? 0),
       avgMarginPct: Number(row.avgMarginPct ?? 0),
+      avgDuration: row.avgDuration != null ? Math.round(Number(row.avgDuration)) : null,
     }));
   } finally {
     if (shouldClose) {
@@ -163,17 +168,27 @@ export async function fetchGenreStats(connection?: mysql.Connection): Promise<Ge
         g.genre_name AS name,
         gs.title_count AS titleCount,
         gs.avg_net_profit AS avgNetProfit,
-        gs.avg_margin_pct AS avgMarginPct
+        gs.avg_margin_pct AS avgMarginPct,
+        dur.avg_duration AS avgDuration
       FROM genre g
       LEFT JOIN genre_stats gs ON gs.genre_id = g.genre_id
+      LEFT JOIN (
+        SELECT tg.genre_id, AVG(t.runtime_minutes) AS avg_duration
+        FROM title_genre tg
+        JOIN title t ON tg.title_id = t.title_id
+        JOIN title_financials f ON t.title_id = f.title_id AND f.budget >= ?
+        WHERE t.runtime_minutes IS NOT NULL AND t.runtime_minutes > 0
+        GROUP BY tg.genre_id
+      ) dur ON dur.genre_id = g.genre_id
       ORDER BY gs.avg_net_profit DESC, g.genre_name ASC;
-    `);
+    `, [MIN_BUDGET]);
 
     return (rows as mysql.RowDataPacket[]).map((row) => ({
       name: row.name as string,
       titleCount: Number(row.titleCount ?? 0),
       avgNetProfit: Number(row.avgNetProfit ?? 0),
       avgMarginPct: Number(row.avgMarginPct ?? 0),
+      avgDuration: row.avgDuration != null ? Math.round(Number(row.avgDuration)) : null,
     }));
   } finally {
     if (shouldClose) {
