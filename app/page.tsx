@@ -1280,12 +1280,9 @@ export default function CanaryDashboard() {
                     {isGekozen && <Check size={14} className="text-indigo-600 shrink-0" />}
                   </button>
                   <button
-                    onClick={(e) => {
-                      setShowMoreActors(false)
-                      openContextPopup(e, "actor", acteur)
-                    }}
+                    onClick={(e) => openContextPopup(e, "actor", acteur)}
                     title="Meer info over deze acteur"
-                    className="p-1 rounded-md text-emerald-700 bg-emerald-50 border border-emerald-100 hover:bg-emerald-100 transition-colors shrink-0"
+                    className="p-1 rounded-md text-slate-400 bg-slate-50 border border-slate-200 hover:bg-slate-100 hover:text-indigo-600 transition-colors shrink-0"
                   >
                     <ChevronDown size={14} />
                   </button>
