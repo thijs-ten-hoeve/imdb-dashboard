@@ -491,7 +491,9 @@ export default function CanaryDashboard() {
     return genreStats
       .map((genre) => {
         const ratio = Math.min(genre.avgRevBudgetRatio ?? 1, 2.5)
-        const winstM = Math.round(maxBudgetM * (ratio - 1) * 10) / 10
+        // success factor: ratio is van films MET revenue data (survivors);
+        // ~30% kans dat een film daadwerkelijk winstgevend wordt
+        const winstM = Math.round(maxBudgetM * (ratio - 1) * 0.3 * 10) / 10
         return {
           name: genre.name,
           titleCount: genre.titleCount,
@@ -541,9 +543,9 @@ export default function CanaryDashboard() {
     const rawRatio = ratioTitles > 0
       ? ratioStats.reduce((sum, s) => sum + s.avgRevBudgetRatio! * s.titleCount, 0) / ratioTitles
       : 1.5
-    const weightedRatio = Math.min(rawRatio, 2.5) // cap: winst nooit meer dan 1.5× max budget
+    const weightedRatio = Math.min(rawRatio, 2.5)
     const maxBudgetM = budgetRange[1] / 1_000_000
-    const baseWinstM = Math.round(maxBudgetM * (weightedRatio - 1) * 10) / 10
+    const baseWinstM = Math.round(maxBudgetM * (weightedRatio - 1) * 0.3 * 10) / 10
 
     // Risicokorting: elk genre boven de 2 kost 10% winst (max 50%)
     const extraGenres = Math.max(0, effectiveGenres.length - 2)
