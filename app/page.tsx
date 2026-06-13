@@ -175,6 +175,11 @@ export default function CanaryDashboard() {
   const [isActorMoviesLoading, setIsActorMoviesLoading] = React.useState(false)
   const [expandedMovieId, setExpandedMovieId] = React.useState<string | null>(null)
 
+  const [actorSearchQuery, setActorSearchQuery] = React.useState<string>("")
+  const [actorSearchResults, setActorSearchResults] = React.useState<ActorInfo[] | null>(null)
+  const [isSearchingActors, setIsSearchingActors] = React.useState(false)
+  const actorSearchRef = React.useRef<HTMLDivElement>(null)
+
   const [popupContent, setPopupContent] = React.useState<{
     type: "actor" | "director"
     id?: string
@@ -253,6 +258,43 @@ export default function CanaryDashboard() {
     fetchGenreActors();
     return () => { cancelled = true; };
   }, [selectedGenre]);
+
+  React.useEffect(() => {
+    const query = actorSearchQuery.trim();
+    if (query.length < 2) {
+      setActorSearchResults(null);
+      setIsSearchingActors(false);
+      return;
+    }
+
+    const timeout = setTimeout(async () => {
+      setIsSearchingActors(true);
+      try {
+        const url = new URL('/api/actors', window.location.origin);
+        url.searchParams.set('search', query);
+        const res = await fetch(url.toString());
+        if (res.ok) {
+          setActorSearchResults(await res.json());
+        }
+      } catch (error) {
+        console.error('Fout bij zoeken acteurs:', error);
+      } finally {
+        setIsSearchingActors(false);
+      }
+    }, 300);
+
+    return () => clearTimeout(timeout);
+  }, [actorSearchQuery]);
+
+  React.useEffect(() => {
+    function handleOutsideClick(event: MouseEvent) {
+      if (actorSearchRef.current && !actorSearchRef.current.contains(event.target as Node)) {
+        setActorSearchQuery("");
+      }
+    }
+    if (actorSearchQuery.trim().length >= 2) document.addEventListener("click", handleOutsideClick)
+    return () => document.removeEventListener("click", handleOutsideClick)
+  }, [actorSearchQuery]);
 
   React.useEffect(() => {
     const delayDebounceFn = setTimeout(async () => {
@@ -348,6 +390,12 @@ export default function CanaryDashboard() {
     setShowMoreActors(false)
     setSelectedActorFilter(null)
     setSelectedSuitableActorId(null)
+  }
+
+  const selectActorSearchResult = (actor: ActorInfo) => {
+    setSelectedActorFilter(actor)
+    setActorSearchQuery("")
+    setActorSearchResults(null)
   }
 
   const toggleSort = (field: SortField) => {
@@ -554,6 +602,52 @@ export default function CanaryDashboard() {
             <h2 className="text-base font-extrabold tracking-tight text-slate-900">Canary Productions</h2>
             <p className="text-slate-500 text-[11px] font-medium tracking-wide uppercase mt-0.5">Prestatiepredictor</p>
           </div>
+        </div>
+
+        {/* Acteur Zoekfilter */}
+        <div ref={actorSearchRef} className="space-y-3 bg-slate-50/50 p-4 rounded-2xl border border-slate-200/60 shadow-sm transition-all hover:border-slate-300/80 relative">
+          <label className="text-[11px] font-bold text-slate-700 uppercase tracking-wider flex items-center gap-1.5">
+            <Search size={14} className="text-amber-500" /> Zoek acteur
+          </label>
+          <div className="relative">
+            <Search className="absolute left-3 top-3 h-4 w-4 text-slate-400" />
+            <Input
+              type="text"
+              placeholder="Naam van een acteur..."
+              value={actorSearchQuery}
+              onChange={(e) => setActorSearchQuery(e.target.value)}
+              className="pl-9 text-xs h-10 bg-white border-slate-200 rounded-xl focus-visible:ring-indigo-500/20 focus-visible:border-indigo-400 transition-all"
+            />
+          </div>
+
+          {actorSearchQuery.trim().length >= 2 && (
+            <div className="absolute left-4 right-4 top-full mt-1 bg-white/95 backdrop-blur-xl rounded-2xl border border-slate-200 shadow-2xl z-30 overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+              {isSearchingActors ? (
+                <div className="p-3 text-[11px] text-slate-400 text-center">Zoeken...</div>
+              ) : actorSearchResults && actorSearchResults.length > 0 ? (
+                <div className="max-h-[260px] overflow-y-auto p-1.5 space-y-1">
+                  {actorSearchResults.slice(0, 8).map((acteur) => (
+                    <button
+                      key={acteur.id}
+                      onClick={() => selectActorSearchResult(acteur)}
+                      className="w-full flex items-center gap-2.5 p-1.5 rounded-xl hover:bg-indigo-50 transition-colors text-left group"
+                    >
+                      <div className="w-7 h-7 rounded-lg bg-slate-100 text-slate-600 border border-slate-200 flex items-center justify-center font-extrabold font-mono text-[10px] shrink-0 overflow-hidden group-hover:scale-105 transition-transform">
+                        <TmdbAvatar name={acteur.name} initials={acteur.initials} />
+                      </div>
+                      <div className="truncate flex-1">
+                        <p className="text-xs font-bold text-slate-800 truncate group-hover:text-indigo-700 transition-colors">{acteur.name}</p>
+                        <span className="text-[10px] text-slate-400 font-mono block">{acteur.genre}</span>
+                      </div>
+                      <span className="text-[10px] font-mono font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded-md border border-emerald-100 shrink-0">{acteur.score}</span>
+                    </button>
+                  ))}
+                </div>
+              ) : (
+                <div className="p-3 text-[11px] text-slate-400 text-center">Geen acteurs gevonden.</div>
+              )}
+            </div>
+          )}
         </div>
 
         {/* Type Media Filter */}
