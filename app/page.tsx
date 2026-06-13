@@ -1093,7 +1093,7 @@ export default function CanaryDashboard() {
                                   rel="noopener noreferrer"
                                   className="flex items-center"
                                 >
-                                  <span style={{ background: '#F5C518', fontFamily: '"Arial Black", Arial, sans-serif', letterSpacing: '-0.2px' }} className="inline-block text-black font-black text-[10px] leading-none px-1 py-[2px] rounded-[3px] ring-1 ring-amber-600/30">
+                                  <span style={{ background: '#F5C518', fontFamily: '"Arial Black", Arial, sans-serif', letterSpacing: '-0.2px', outline: '1px solid #000', outlineOffset: '-1px' }} className="inline-block text-black font-black text-[10px] leading-none px-1 py-[2px] rounded-[3px]">
                                     IMDb {liveImdbRating}
                                   </span>
                                 </a>
