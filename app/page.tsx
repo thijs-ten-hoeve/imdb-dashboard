@@ -124,6 +124,7 @@ interface GenreInfo {
   avgMarginPct: number
   avgDuration: number | null
   avgRevBudgetRatio: number | null
+  revenueCoverage: number | null
 }
 
 function formatBudget(value: number): string {
@@ -536,16 +537,21 @@ export default function CanaryDashboard() {
     // Gewogen statistieken (gewogen naar titleCount per genre)
     const totalTitles = matchingStats.reduce((sum, s) => sum + s.titleCount, 0)
 
-    // Gebruik echte revenue/budget ratio uit de database, gecapped op 3.5×
-    // (zelfs het meest winstgevende genre returnt gemiddeld niet meer dan ~3-4× budget)
+    // Gebruik echte revenue/budget ratio, gecorrigeerd voor survivorship bias:
+    // rawRatio = avg van films MÉT revenue-data (opgeblazen door selectiebias)
+    // coverage = aandeel films dat revenue-data heeft (bijv. 0.25 = 25% had meetbare omzet)
+    // adjustedRatio = rawRatio × coverage → behoudt differentiatie per genre
     const ratioStats = matchingStats.filter(s => s.avgRevBudgetRatio != null)
     const ratioTitles = ratioStats.reduce((sum, s) => sum + s.titleCount, 0)
     const rawRatio = ratioTitles > 0
       ? ratioStats.reduce((sum, s) => sum + s.avgRevBudgetRatio! * s.titleCount, 0) / ratioTitles
-      : 1.5
-    const weightedRatio = Math.min(rawRatio, 2.5)
+      : 1.0
+    const avgCoverage = ratioTitles > 0
+      ? ratioStats.reduce((sum, s) => sum + (s.revenueCoverage ?? 0) * s.titleCount, 0) / ratioTitles
+      : 0.25
+    const adjustedRatio = Math.min(rawRatio * avgCoverage, 2.0)
     const maxBudgetM = budgetRange[1] / 1_000_000
-    const baseWinstM = Math.round(maxBudgetM * (weightedRatio - 1) * 0.3 * 10) / 10
+    const baseWinstM = Math.round(maxBudgetM * (adjustedRatio - 1) * 10) / 10
 
     // Risicokorting: elk genre boven de 2 kost 10% winst (max 50%)
     const extraGenres = Math.max(0, effectiveGenres.length - 2)
