@@ -8,7 +8,7 @@ const GENRE_NL: Record<string, string> = {
   Documentary: "Documentaire",
   Drama: "Drama",
   Family: "Familie",
-  Fantasy: "Fantasy",
+  Fantasy: "Fantasie",
   "Film-Noir": "Film Noir",
   History: "Geschiedenis",
   Horror: "Horror",

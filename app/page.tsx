@@ -204,6 +204,9 @@ export default function CanaryDashboard() {
   const [moreDirectorsPosition, setMoreDirectorsPosition] = React.useState<{ x: number; y: number }>({ x: 0, y: 0 })
   const moreDirectorsRef = React.useRef<HTMLDivElement>(null)
   const [expandedDirectorInDropdown, setExpandedDirectorInDropdown] = React.useState<string | null>(null)
+
+  const [showGenreDropdown, setShowGenreDropdown] = React.useState(false)
+  const genreDropdownRef = React.useRef<HTMLDivElement>(null)
   const [selectedSuitableActorId, setSelectedSuitableActorId] = React.useState<string | null>(null)
   const [searchedSuitableActor, setSearchedSuitableActor] = React.useState<ActorInfo | null>(null)
 
@@ -404,6 +407,16 @@ export default function CanaryDashboard() {
     if (showMoreDirectors) document.addEventListener("click", handleOutsideClick)
     return () => document.removeEventListener("click", handleOutsideClick)
   }, [showMoreDirectors])
+
+  React.useEffect(() => {
+    function handleOutsideClick(event: MouseEvent) {
+      if (genreDropdownRef.current && !genreDropdownRef.current.contains(event.target as Node)) {
+        setShowGenreDropdown(false)
+      }
+    }
+    if (showGenreDropdown) document.addEventListener("click", handleOutsideClick)
+    return () => document.removeEventListener("click", handleOutsideClick)
+  }, [showGenreDropdown])
 
   const toggleMoreDirectors = (e: React.MouseEvent) => {
     e.stopPropagation()
@@ -676,37 +689,59 @@ export default function CanaryDashboard() {
         </div>
 
         {/* Genre Filter */}
-        <div className="space-y-3">
+        <div className="space-y-2" ref={genreDropdownRef}>
           <div className="flex items-center justify-between px-1">
             <span className="text-xs font-bold text-slate-700 uppercase tracking-wider block">Kies een genre</span>
             {selectedGenre && (
               <button onClick={() => handleGenreChange(null)} className="text-[10px] bg-amber-100 text-amber-700 px-2 py-1 rounded-md font-bold hover:bg-amber-200 transition-colors">
-                Reset Filter
+                Reset
               </button>
             )}
           </div>
-          
-          <div className="grid grid-cols-2 gap-2.5 max-h-[250px] overflow-y-auto pr-1 scrollbar-thin scrollbar-thumb-slate-200 scrollbar-track-transparent">
-            {rankedGenres.map((genreItem) => {
-              const isSelected = genreItem.name === selectedGenre
-              return (
-                <button
-                  key={genreItem.name}
-                  onClick={() => handleGenreChange(isSelected ? null : genreItem.name)}
-                  className={`p-3 rounded-xl text-xs text-center transition-all duration-300 active:scale-95 border ${
-                    isSelected 
-                      ? "bg-gradient-to-b from-indigo-900 to-indigo-950 border-indigo-900 text-white font-bold shadow-md shadow-indigo-900/20 ring-2 ring-indigo-500/20" 
-                      : "bg-white border-slate-200 text-slate-600 hover:border-indigo-300 hover:shadow-sm hover:text-indigo-900"
-                  }`}
-                >
-                  <span className="block truncate">{genreNl(genreItem.name)}</span>
-                  <span className={`text-[11px] font-mono block mt-1 ${isSelected ? 'text-indigo-200 font-bold' : 'text-slate-400'}`}>
-                    {genreItem.titleCount > 0 ? `€${genreItem.value.toFixed(1)}M gem.` : "—"}
-                  </span>
-                </button>
-              )
-            })}
-          </div>
+
+          {/* Trigger knop */}
+          <button
+            onClick={() => setShowGenreDropdown(v => !v)}
+            className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl border text-xs font-semibold transition-all ${
+              selectedGenre
+                ? "bg-gradient-to-r from-amber-500 to-amber-600 border-amber-500 text-white shadow-sm shadow-amber-400/20"
+                : "bg-white border-slate-200 text-slate-600 hover:border-amber-400 hover:text-amber-700"
+            }`}
+          >
+            <span>{selectedGenre ? genreNl(selectedGenre) : "Selecteer genre..."}</span>
+            <ChevronDown size={14} className={`transition-transform duration-200 ${showGenreDropdown ? "rotate-180" : ""}`} />
+          </button>
+
+          {/* Dropdown lijst */}
+          {showGenreDropdown && (
+            <div className="rounded-xl border border-slate-200 bg-white shadow-lg overflow-hidden">
+              <div className="max-h-[260px] overflow-y-auto scrollbar-thin scrollbar-thumb-slate-200 scrollbar-track-transparent">
+                {rankedGenres.map((genreItem) => {
+                  const isSelected = genreItem.name === selectedGenre
+                  return (
+                    <button
+                      key={genreItem.name}
+                      onClick={() => { handleGenreChange(isSelected ? null : genreItem.name); setShowGenreDropdown(false) }}
+                      className={`w-full flex items-center justify-between px-3 py-2 text-xs transition-colors border-b border-slate-100 last:border-0 ${
+                        isSelected
+                          ? "bg-amber-50 text-amber-800 font-bold"
+                          : "text-slate-700 hover:bg-amber-50 hover:text-amber-800"
+                      }`}
+                    >
+                      <span className="flex items-center gap-2">
+                        {isSelected && <span className="w-1.5 h-1.5 rounded-full bg-amber-500 shrink-0" />}
+                        {!isSelected && <span className="w-1.5 h-1.5 rounded-full bg-transparent shrink-0" />}
+                        {genreNl(genreItem.name)}
+                      </span>
+                      <span className="font-mono text-[10px] text-slate-400 shrink-0">
+                        {genreItem.titleCount > 0 ? `€${genreItem.value.toFixed(1)}M` : "—"}
+                      </span>
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Sliders Container */}
