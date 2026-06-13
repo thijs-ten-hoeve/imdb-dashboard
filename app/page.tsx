@@ -4,7 +4,7 @@ import { Inter, JetBrains_Mono } from "next/font/google"
 import Image from "next/image"
 import {
   Calendar, Layers, DollarSign, Clapperboard, Clock,
-  UserCheck, Search, X, Check, ChevronDown, ChevronUp, Star, ExternalLink,
+  UserCheck, Search, X, Check, ChevronDown, Star, ExternalLink,
   ArrowUp, ArrowDown, ArrowUpDown, TrendingUp, Info, Pencil
 } from "lucide-react"
 
@@ -92,16 +92,17 @@ interface MovieData {
 }
 
 interface DirectorInfo {
+  id?: string
   name: string
   initials: string
   bio: string
   genre?: string
-}
-
-const REGISSEUR_SUGGESTIES: Record<string, DirectorInfo> = {
-  Algemeen: { name: "Christopher Nolan", initials: "CN", bio: "Visionaire filmmaker bekend om complexe structuren en intellectuele blockbusters." },
-  Actie: { name: "Denis Villeneuve", initials: "DV", bio: "Meester in visuele grootsheid, sfeer en strakke cinematografische actie." },
-  Drama: { name: "Christopher Nolan", initials: "CN", bio: "Visionaire filmmaker bekend om zijn meeslepende, diepgaande drama's." },
+  score?: number
+  birthYear?: number | null
+  deathYear?: number | null
+  filmCount?: number
+  avgProfitM?: number
+  avgRating?: number | null
 }
 
 interface ActorInfo {
@@ -150,6 +151,7 @@ export default function CanaryDashboard() {
   const [allActors, setAllActors] = React.useState<ActorInfo[]>([])
   const [genreActors, setGenreActors] = React.useState<ActorInfo[] | null>(null)
   const [genreStats, setGenreStats] = React.useState<GenreInfo[]>([])
+  const [topDirector, setTopDirector] = React.useState<DirectorInfo | null>(null)
   
   // Laad States
   const [isInitialLoading, setIsInitialLoading] = React.useState(true) 
@@ -158,9 +160,8 @@ export default function CanaryDashboard() {
   // Filter State
   const [productionType, setProductionType] = React.useState<string>("all")
   const [selectedGenre, setSelectedGenre] = React.useState<string | null>(null)
-  const [budgetRange, setBudgetRange] = React.useState<[number, number]>([10_000, 1_000_000_000])
+  const [budgetRange, setBudgetRange] = React.useState<[number, number]>([1_000_000, 1_000_000_000])
   const [budgetCeiling, setBudgetCeiling] = React.useState<number>(1_000_000_000)
-  const [budgetInputMin, setBudgetInputMin] = React.useState<string>(formatBudget(10_000))
   const [budgetInputMax, setBudgetInputMax] = React.useState<string>(formatBudget(1_000_000_000))
   const prevCatalogKey = React.useRef<string>('')
   const [yearRange, setYearRange] = React.useState<number[]>([1970, 2026])
@@ -173,12 +174,10 @@ export default function CanaryDashboard() {
   const [selectedActorFilter, setSelectedActorFilter] = React.useState<ActorInfo | null>(null)
   const [actorMovies, setActorMovies] = React.useState<any[]>([])
   const [isActorMoviesLoading, setIsActorMoviesLoading] = React.useState(false)
-  const [expandedMovieId, setExpandedMovieId] = React.useState<string | null>(null)
 
   const [actorSearchQuery, setActorSearchQuery] = React.useState<string>("")
   const [actorSearchResults, setActorSearchResults] = React.useState<ActorInfo[] | null>(null)
   const [isSearchingActors, setIsSearchingActors] = React.useState(false)
-  const actorSearchRef = React.useRef<HTMLDivElement>(null)
 
   const [popupContent, setPopupContent] = React.useState<{
     type: "actor" | "director"
@@ -197,6 +196,7 @@ export default function CanaryDashboard() {
   const [showMoreActors, setShowMoreActors] = React.useState(false)
   const [moreActorsPosition, setMoreActorsPosition] = React.useState<{ x: number; y: number }>({ x: 0, y: 0 })
   const moreActorsRef = React.useRef<HTMLDivElement>(null)
+  const [expandedActorInDropdown, setExpandedActorInDropdown] = React.useState<string | null>(null)
   const [selectedSuitableActorId, setSelectedSuitableActorId] = React.useState<string | null>(null)
   const [searchedSuitableActor, setSearchedSuitableActor] = React.useState<ActorInfo | null>(null)
 
@@ -222,43 +222,55 @@ export default function CanaryDashboard() {
   }, [yearRange]);
 
   React.useEffect(() => {
-    async function fetchActors() {
-      try {
-        const actorsRes = await fetch('/api/actors');
-        if (actorsRes.ok) {
-          setAllActors(await actorsRes.json());
-        }
-      } catch (error) {
-        console.error("Fout bij ophalen acteurs:", error);
-      }
-    }
-    fetchActors();
-  }, []);
-
-  React.useEffect(() => {
-    if (!selectedGenre) {
-      setGenreActors(null);
-      return;
-    }
-
     let cancelled = false;
 
-    async function fetchGenreActors() {
+    function filterParams() {
+      const p = new URLSearchParams();
+      p.set('startYear', yearRange[0].toString());
+      p.set('endYear',   yearRange[1].toString());
+      p.set('minBudget', Math.round(budgetRange[0] / 1_000_000).toString());
+      p.set('maxBudget', Math.round(budgetRange[1] / 1_000_000).toString());
+      return p;
+    }
+
+    async function fetchActorsAndDirector() {
+      const p = filterParams();
+
+      if (selectedGenre) p.set('genre', selectedGenre);
+
       try {
-        const url = new URL('/api/actors', window.location.origin);
-        url.searchParams.set('genre', selectedGenre as string);
-        const res = await fetch(url.toString());
-        if (res.ok && !cancelled) {
-          setGenreActors(await res.json());
+        const actorsUrl = new URL('/api/actors', window.location.origin);
+        actorsUrl.search = p.toString();
+        const actorsRes = await fetch(actorsUrl.toString());
+        if (actorsRes.ok && !cancelled) {
+          const data = await actorsRes.json();
+          if (selectedGenre) setGenreActors(data);
+          else { setAllActors(data); setGenreActors(null); }
         }
       } catch (error) {
-        console.error('Fout bij ophalen acteurs voor genre:', error);
+        console.error('Fout bij ophalen acteurs:', error);
+      }
+
+      const dp = filterParams();
+      dp.set('limit', '1');
+      if (selectedGenre) dp.set('genre', selectedGenre);
+      try {
+        const dirUrl = new URL('/api/directors', window.location.origin);
+        dirUrl.search = dp.toString();
+        const dirRes = await fetch(dirUrl.toString());
+        if (dirRes.ok && !cancelled) {
+          const data = await dirRes.json();
+          if (data.length > 0) setTopDirector(data[0]);
+          else setTopDirector(null);
+        }
+      } catch (error) {
+        console.error('Fout bij ophalen regisseur:', error);
       }
     }
 
-    fetchGenreActors();
+    fetchActorsAndDirector();
     return () => { cancelled = true; };
-  }, [selectedGenre]);
+  }, [selectedGenre, yearRange, budgetRange]);
 
   React.useEffect(() => {
     const query = actorSearchQuery.trim();
@@ -273,6 +285,7 @@ export default function CanaryDashboard() {
       try {
         const url = new URL('/api/actors', window.location.origin);
         url.searchParams.set('search', query);
+        if (selectedGenre) url.searchParams.set('genre', selectedGenre);
         const res = await fetch(url.toString());
         if (res.ok) {
           setActorSearchResults(await res.json());
@@ -285,17 +298,7 @@ export default function CanaryDashboard() {
     }, 300);
 
     return () => clearTimeout(timeout);
-  }, [actorSearchQuery]);
-
-  React.useEffect(() => {
-    function handleOutsideClick(event: MouseEvent) {
-      if (actorSearchRef.current && !actorSearchRef.current.contains(event.target as Node)) {
-        setActorSearchQuery("");
-      }
-    }
-    if (actorSearchQuery.trim().length >= 2) document.addEventListener("click", handleOutsideClick)
-    return () => document.removeEventListener("click", handleOutsideClick)
-  }, [actorSearchQuery]);
+  }, [actorSearchQuery, selectedGenre]);
 
   React.useEffect(() => {
     const delayDebounceFn = setTimeout(async () => {
@@ -330,7 +333,7 @@ export default function CanaryDashboard() {
           )[0];
           if (top?.budget > 0) {
             setBudgetCeiling(top.budget);
-            setBudgetRange(prev => [prev[0], top.budget]);
+            setBudgetRange([1_000_000, top.budget]);
             setBudgetInputMax(formatBudget(top.budget));
           }
         }
@@ -359,6 +362,9 @@ export default function CanaryDashboard() {
     function handleOutsideClick(event: MouseEvent) {
       if (moreActorsRef.current && !moreActorsRef.current.contains(event.target as Node)) {
         setShowMoreActors(false)
+        setActorSearchQuery("")
+        setActorSearchResults(null)
+        setExpandedActorInDropdown(null)
       }
     }
     if (showMoreActors) document.addEventListener("click", handleOutsideClick)
@@ -383,7 +389,7 @@ export default function CanaryDashboard() {
   }
 
   const handleGenreChange = (genre: string | null) => {
-    setBudgetRange(prev => [prev[0], 1_000_000_000])
+    setBudgetRange([1_000_000, 1_000_000_000])
     setBudgetCeiling(1_000_000_000)
     setBudgetInputMax(formatBudget(1_000_000_000))
     setSelectedGenre(genre)
@@ -395,11 +401,11 @@ export default function CanaryDashboard() {
   }
 
   const selectActorSearchResult = (actor: ActorInfo) => {
-    setSelectedActorFilter(actor)
     setSearchedSuitableActor(actor)
     setSelectedSuitableActorId(null)
     setActorSearchQuery("")
     setActorSearchResults(null)
+    setShowMoreActors(false)
   }
 
   const toggleSort = (field: SortField) => {
@@ -492,8 +498,7 @@ export default function CanaryDashboard() {
     [displayedMovies, filmPageSize]
   )
 
-  const huidigeRegisseurKey = selectedGenre || "Algemeen"
-  const geselecteerdeRegisseur = REGISSEUR_SUGGESTIES[huidigeRegisseurKey] || REGISSEUR_SUGGESTIES["Algemeen"]
+  const geselecteerdeRegisseur: DirectorInfo = topDirector ?? { name: "—", initials: "?", bio: "Laden..." }
 
   const rankedActeursVoorContext = React.useMemo<ActorInfo[]>(() => {
     const source = selectedGenre ? (genreActors ?? []) : allActors
@@ -519,7 +524,7 @@ export default function CanaryDashboard() {
     setPopupPosition({ x: targetX, y: e.pageY - 20 })
     
     const scoreVal = "score" in data ? data.score : undefined
-    const genreVal = "genre" in data && data.genre ? data.genre : huidigeRegisseurKey
+    const genreVal = "genre" in data && data.genre ? data.genre : (selectedGenre || "Algemeen")
     const idVal = "id" in data ? data.id : undefined
     const birthYearVal = "birthYear" in data ? data.birthYear : undefined
     const deathYearVal = "deathYear" in data ? data.deathYear : undefined
@@ -558,9 +563,6 @@ export default function CanaryDashboard() {
     }
   }
 
-  const toggleMovieExpand = (movieId: string) => {
-    setExpandedMovieId(expandedMovieId === movieId ? null : movieId)
-  }
 
   // Generate chart data formatting
   const chartDataFilms = displayedMovies.slice(0, 12).map((m) => ({
@@ -610,51 +612,6 @@ export default function CanaryDashboard() {
           </div>
         </div>
 
-        {/* Acteur Zoekfilter */}
-        <div ref={actorSearchRef} className="space-y-3 bg-slate-50/50 p-4 rounded-2xl border border-slate-200/60 shadow-sm transition-all hover:border-slate-300/80 relative">
-          <label className="text-[11px] font-bold text-slate-700 uppercase tracking-wider flex items-center gap-1.5">
-            <Search size={14} className="text-amber-500" /> Zoek acteur
-          </label>
-          <div className="relative">
-            <Search className="absolute left-3 top-3 h-4 w-4 text-slate-400" />
-            <Input
-              type="text"
-              placeholder="Naam van een acteur..."
-              value={actorSearchQuery}
-              onChange={(e) => setActorSearchQuery(e.target.value)}
-              className="pl-9 text-xs h-10 bg-white border-slate-200 rounded-xl focus-visible:ring-indigo-500/20 focus-visible:border-indigo-400 transition-all"
-            />
-          </div>
-
-          {actorSearchQuery.trim().length >= 2 && (
-            <div className="absolute left-4 right-4 top-full mt-1 bg-white/95 backdrop-blur-xl rounded-2xl border border-slate-200 shadow-2xl z-30 overflow-hidden animate-in fade-in zoom-in-95 duration-200">
-              {isSearchingActors ? (
-                <div className="p-3 text-[11px] text-slate-400 text-center">Zoeken...</div>
-              ) : actorSearchResults && actorSearchResults.length > 0 ? (
-                <div className="max-h-[260px] overflow-y-auto p-1.5 space-y-1">
-                  {actorSearchResults.slice(0, 8).map((acteur) => (
-                    <button
-                      key={acteur.id}
-                      onClick={() => selectActorSearchResult(acteur)}
-                      className="w-full flex items-center gap-2.5 p-1.5 rounded-xl hover:bg-indigo-50 transition-colors text-left group"
-                    >
-                      <div className="w-7 h-7 rounded-lg bg-slate-100 text-slate-600 border border-slate-200 flex items-center justify-center font-extrabold font-mono text-[10px] shrink-0 overflow-hidden group-hover:scale-105 transition-transform">
-                        <TmdbAvatar name={acteur.name} initials={acteur.initials} />
-                      </div>
-                      <div className="truncate flex-1">
-                        <p className="text-xs font-bold text-slate-800 truncate group-hover:text-indigo-700 transition-colors">{acteur.name}</p>
-                        <span className="text-[10px] text-slate-400 font-mono block">{acteur.genre}</span>
-                      </div>
-                      <span className="text-[10px] font-mono font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded-md border border-emerald-100 shrink-0">{acteur.score}</span>
-                    </button>
-                  ))}
-                </div>
-              ) : (
-                <div className="p-3 text-[11px] text-slate-400 text-center">Geen acteurs gevonden.</div>
-              )}
-            </div>
-          )}
-        </div>
 
         {/* Type Media Filter */}
         <div className="space-y-3 bg-slate-50/50 p-4 rounded-2xl border border-slate-200/60 shadow-sm transition-all hover:border-slate-300/80">
@@ -717,46 +674,32 @@ export default function CanaryDashboard() {
               <DollarSign size={14} className="text-amber-500" /> Investeringsbudget
             </label>
             <div className="flex items-center gap-2">
-              {([
-                { key: "min", value: budgetInputMin, set: setBudgetInputMin, side: "min" },
-                { key: "max", value: budgetInputMax, set: setBudgetInputMax, side: "max" },
-              ] as const).map(({ key, value, set, side }) => (
-                <div key={key} className="flex items-center gap-1 flex-1 text-[11px] font-bold text-indigo-700 font-mono bg-white rounded-md border border-indigo-100 shadow-sm overflow-hidden">
-                  <span className="pl-2 text-slate-400">€</span>
-                  <input
-                    type="text"
-                    inputMode="numeric"
-                    value={value}
-                    onChange={(e) => set(e.target.value)}
-                    onBlur={(e) => {
-                      const raw = parseBudget(e.target.value)
-                      if (side === "min") {
-                        const val = Math.min(budgetRange[1] - 1_000, Math.max(10_000, raw))
-                        setBudgetRange([val, budgetRange[1]])
-                        set(formatBudget(val))
-                      } else {
-                        const val = Math.max(budgetRange[0] + 1_000, raw)
-                        setBudgetRange([budgetRange[0], val])
-                        set(formatBudget(val))
-                      }
-                    }}
-                    onKeyDown={(e) => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur() }}
-                    className="w-full pr-2 py-0.5 text-right bg-transparent focus:outline-none"
-                  />
-                </div>
-              ))}
+              <div className="flex items-center gap-1 flex-1 text-[11px] font-bold text-indigo-700 font-mono bg-white rounded-md border border-indigo-100 shadow-sm overflow-hidden">
+                <span className="pl-2 text-slate-400">€</span>
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  value={budgetInputMax}
+                  onChange={(e) => setBudgetInputMax(e.target.value)}
+                  onBlur={(e) => {
+                    const val = Math.max(1_000_000, parseBudget(e.target.value))
+                    setBudgetRange([1_000_000, val])
+                    setBudgetInputMax(formatBudget(val))
+                  }}
+                  onKeyDown={(e) => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur() }}
+                  className="w-full pr-2 py-0.5 text-right bg-transparent focus:outline-none"
+                />
+              </div>
             </div>
             <Slider
-              value={budgetRange}
+              value={[budgetRange[1]]}
               onValueChange={(val) => {
-                setBudgetRange([val[0], val[1]])
-                setBudgetInputMin(formatBudget(val[0]))
-                setBudgetInputMax(formatBudget(val[1]))
+                setBudgetRange([1_000_000, val[0]])
+                setBudgetInputMax(formatBudget(val[0]))
               }}
-              min={10_000}
+              min={1_000_000}
               max={budgetCeiling}
-              step={1_000}
-              minStepsBetweenThumbs={1}
+              step={1_000_000}
               className="cursor-grab"
             />
           </div>
@@ -771,7 +714,7 @@ export default function CanaryDashboard() {
               </span>
             </div>
             <Slider value={yearRange} onValueChange={(val) => {
-                setBudgetRange(prev => [prev[0], 1_000_000_000])
+                setBudgetRange([1_000_000, 1_000_000_000])
                 setBudgetCeiling(1_000_000_000)
                 setBudgetInputMax(formatBudget(1_000_000_000))
                 setYearRange(val)
@@ -848,9 +791,9 @@ export default function CanaryDashboard() {
                     <button
                       onClick={toggleMoreActors}
                       title="Wijzig geschikte acteur"
-                      className={`p-1.5 rounded-lg border transition-colors shrink-0 ${showMoreActors ? "bg-indigo-950 border-indigo-950 text-white" : "bg-slate-50 border-slate-200 text-slate-400 hover:text-indigo-600 hover:border-indigo-300"}`}
+                      className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border text-xs font-semibold transition-colors shrink-0 ${showMoreActors ? "bg-indigo-950 border-indigo-950 text-white" : "bg-slate-50 border-slate-200 text-slate-500 hover:text-indigo-600 hover:border-indigo-300"}`}
                     >
-                      <Pencil size={14} />
+                      <Pencil size={12} /> Verander
                     </button>
                   )}
                 </div>
@@ -1056,27 +999,38 @@ export default function CanaryDashboard() {
             {paginatedMovies.length > 0 ? (
               <div className="space-y-2.5">
                 {paginatedMovies.map((movie, index) => {
-                  const isExpanded = expandedMovieId === movie.id
-                  const liveImdbRating = movie.imdbRating && !isNaN(Number(movie.imdbRating)) 
-                    ? Number(movie.imdbRating).toFixed(1) 
-                    : "N/A"
+                  const liveImdbRating = movie.imdbRating && !isNaN(Number(movie.imdbRating))
+                    ? Number(movie.imdbRating).toFixed(1)
+                    : null
                   const compactBudget = `€${(movie.budget / 1000000).toFixed(1)}M`
                   const compactProfit = `€${(movie.nettoWinst / 1000000).toFixed(1)}M`
 
                   return (
-                    <div key={movie.id} className={`p-4 rounded-2xl border transition-all duration-300 flex flex-col gap-4 group ${movie.genre === selectedGenre ? "border-indigo-200/60 bg-indigo-50/30 hover:border-indigo-300" : "border-slate-200/60 bg-white hover:border-slate-300 hover:shadow-md hover:-translate-y-0.5"}`}>
-                      <div
-                        onClick={() => toggleMovieExpand(movie.id)}
-                        className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 cursor-pointer"
-                      >
+                    <div key={movie.id} className={`p-4 rounded-2xl border transition-all duration-300 flex flex-col group ${movie.genre === selectedGenre ? "border-indigo-200/60 bg-indigo-50/30 hover:border-indigo-300" : "border-slate-200/60 bg-white hover:border-slate-300 hover:shadow-md hover:-translate-y-0.5"}`}>
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                         <div className="flex gap-4 truncate items-start">
                           <span className="text-xs font-bold text-slate-400 font-mono pt-1 min-w-[24px]">#{index + 1}</span>
                           <div className="truncate">
-                            <h4 className="text-sm font-extrabold text-slate-900 truncate group-hover:text-indigo-600 transition-colors">{movie.title}</h4>
+                            <a
+                              href={`https://www.imdb.com/title/${movie.id}/`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-sm font-extrabold text-slate-900 truncate group-hover:text-indigo-600 transition-colors block"
+                            >
+                              {movie.title}
+                            </a>
                             <div className="flex items-center gap-2 mt-1.5 flex-wrap text-[11px] font-mono text-slate-500">
                               <span className="font-sans font-bold text-indigo-800 bg-indigo-100/50 px-2 py-0.5 rounded-md border border-indigo-100">{movie.genre}</span>
                               <span className="bg-slate-100 px-2 py-0.5 rounded-md text-slate-600 border border-slate-200/60">{movie.type}</span>
-                              <span className="text-amber-600 font-bold flex items-center gap-1 bg-amber-50 px-2 py-0.5 rounded-md border border-amber-200/50"><Star size={10} className="fill-current" /> {liveImdbRating}</span>
+                              {liveImdbRating && (
+                                <span className="flex items-center gap-1.5">
+                                  <svg width="32" height="16" viewBox="0 0 32 16" xmlns="http://www.w3.org/2000/svg" aria-label="IMDb">
+                                    <rect width="32" height="16" rx="2.5" fill="#F5C518"/>
+                                    <text x="16" y="11.5" fontSize="9.5" fontWeight="800" textAnchor="middle" fontFamily="Arial Black,Arial,sans-serif" fill="#000000" letterSpacing="-0.3">IMDb</text>
+                                  </svg>
+                                  <span className="font-bold text-slate-700">{liveImdbRating}</span>
+                                </span>
+                              )}
                               <span className="font-semibold text-slate-600">{movie.year}</span>
                               <span className="flex items-center gap-1 font-semibold text-slate-600"><Clock size={10} /> {movie.durationMinutes} min</span>
                             </div>
@@ -1093,26 +1047,8 @@ export default function CanaryDashboard() {
                               </span>
                             </div>
                           </div>
-                          <div className={`h-9 w-9 rounded-xl border flex items-center justify-center shrink-0 transition-all shadow-sm ${isExpanded ? "bg-indigo-950 border-indigo-950 text-white" : "bg-white border-slate-200 text-slate-700 group-hover:bg-slate-50"}`}>
-                            {isExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
-                          </div>
                         </div>
                       </div>
-                      
-                      {/* Dark Blue Expansion Panel */}
-                      {isExpanded && (
-                        <div className="bg-slate-900 border border-indigo-950 rounded-2xl p-5 mt-2 space-y-4 text-xs text-slate-300 animate-in slide-in-from-top-2 fade-in shadow-inner">
-                           <div className="flex items-center gap-3 border-b border-slate-700 pb-4 flex-wrap">
-                            <a href={`https://www.imdb.com/find?q=${encodeURIComponent(movie.title)}`} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()} className="h-9 px-4 rounded-xl bg-slate-800 border border-slate-700 text-slate-200 hover:bg-slate-700 hover:text-white font-bold flex items-center gap-2 shadow-sm active:scale-95 transition-colors">
-                              <ExternalLink size={14} /> IMDb Pagina
-                            </a>
-                           </div>
-                           <div className="bg-slate-800 p-4 rounded-xl border border-slate-700 shadow-sm">
-                            <p className="font-extrabold text-slate-200 mb-2 font-mono uppercase text-[10px] tracking-wider flex items-center gap-1.5"><Info size={12} className="text-indigo-400" /> Synopsis & Studio Log</p>
-                            <p className="text-slate-400 leading-relaxed">In deze meeslepende <span className="font-semibold text-white">{movie.genre.toLowerCase()}</span> productie gelanceerd in {movie.year} met een looptijd van {movie.durationMinutes} minuten, op een studio-budget van <span className="text-indigo-300 font-mono">{compactBudget}</span> met een geschatte rating van <span className="text-amber-400 font-bold">{liveImdbRating}/10</span>.</p>
-                           </div>
-                        </div>
-                      )}
                     </div>
                   )
                 })}
@@ -1194,7 +1130,9 @@ export default function CanaryDashboard() {
                        initials: popupContent.initials,
                        score: popupContent.score || 0,
                        genre: popupContent.genre,
-                       bio: popupContent.bio
+                       bio: popupContent.bio,
+                       birthYear: null,
+                       deathYear: null,
                      }
                    );
                    setPopupContent(null);
@@ -1209,40 +1147,91 @@ export default function CanaryDashboard() {
       )}
 
       {showMoreActors && (
-        <div ref={moreActorsRef} className="absolute w-[260px] bg-white/95 backdrop-blur-xl rounded-2xl border border-slate-200 p-3 shadow-2xl z-50 animate-in fade-in zoom-in-95 duration-200" style={{ top: moreActorsPosition.y, left: moreActorsPosition.x }}>
-          <p className="text-[10px] font-bold text-slate-400 uppercase font-mono tracking-wider px-1 pb-2 mb-1 border-b border-slate-100">
+        <div ref={moreActorsRef} className="absolute w-[280px] bg-white/95 backdrop-blur-xl rounded-2xl border border-slate-200 p-3 shadow-2xl z-50 animate-in fade-in zoom-in-95 duration-200" style={{ top: moreActorsPosition.y, left: moreActorsPosition.x }}>
+          <p className="text-[10px] font-bold text-slate-400 uppercase font-mono tracking-wider px-1 pb-2 mb-2 border-b border-slate-100">
             Top acteurs{selectedGenre ? ` · ${selectedGenre}` : ""}
           </p>
+
+          {/* Zoekbalk */}
+          <div className="relative mb-2">
+            <Search className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-slate-400" />
+            <input
+              type="text"
+              placeholder={selectedGenre ? `Zoek in ${selectedGenre}...` : "Zoek acteur..."}
+              value={actorSearchQuery}
+              onChange={(e) => setActorSearchQuery(e.target.value)}
+              className="w-full pl-7 pr-3 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:border-indigo-400 focus:ring-1 focus:ring-indigo-500/20 transition-all"
+            />
+          </div>
+
+          {/* Zoekresultaten of top-lijst */}
           <div className="space-y-1 max-h-[280px] overflow-y-auto">
-            {rankedActeursVoorContext.slice(0, 8).map((acteur, i) => {
-              const isGekozen = geselecteerdeActeur?.id === acteur.id
-              return (
-                <div
-                  key={acteur.id}
-                  className={`w-full flex items-center gap-2.5 p-1.5 rounded-xl transition-colors group ${isGekozen ? "bg-indigo-50" : "hover:bg-indigo-50"}`}
-                >
+            {actorSearchQuery.trim().length >= 2 ? (
+              isSearchingActors ? (
+                <div className="p-3 text-[11px] text-slate-400 text-center">Zoeken...</div>
+              ) : actorSearchResults && actorSearchResults.length > 0 ? (
+                actorSearchResults.slice(0, 8).map((acteur) => (
                   <button
-                    onClick={() => { setSearchedSuitableActor(null); setSelectedSuitableActorId(acteur.id) }}
-                    title="Maak geschikte acteur"
-                    className="flex items-center gap-2.5 flex-1 min-w-0 text-left"
+                    key={acteur.id}
+                    onClick={() => selectActorSearchResult(acteur)}
+                    className="w-full flex items-center gap-2.5 p-1.5 rounded-xl hover:bg-indigo-50 transition-colors text-left group"
                   >
-                    <span className="text-[10px] font-bold text-slate-400 font-mono w-4 text-right shrink-0">{i + 1}</span>
                     <div className="w-7 h-7 rounded-lg bg-slate-100 text-slate-600 border border-slate-200 flex items-center justify-center font-extrabold font-mono text-[10px] shrink-0 overflow-hidden group-hover:scale-105 transition-transform">
                       <TmdbAvatar name={acteur.name} initials={acteur.initials} />
                     </div>
-                    <span className="text-xs font-bold text-slate-800 truncate group-hover:text-indigo-700 transition-colors flex-1">{acteur.name}</span>
-                    {isGekozen && <Check size={14} className="text-indigo-600 shrink-0" />}
+                    <div className="truncate flex-1">
+                      <p className="text-xs font-bold text-slate-800 truncate group-hover:text-indigo-700 transition-colors">{acteur.name}</p>
+                      <span className="text-[10px] text-slate-400 font-mono">{acteur.genre}</span>
+                    </div>
+                    <span className="text-[10px] font-mono font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded-md border border-emerald-100 shrink-0">{acteur.score}</span>
                   </button>
-                  <button
-                    onClick={(e) => openContextPopup(e, "actor", acteur)}
-                    title="Meer info over deze acteur"
-                    className="p-1 rounded-md text-slate-400 bg-slate-50 border border-slate-200 hover:bg-slate-100 hover:text-indigo-600 transition-colors shrink-0"
-                  >
-                    <ChevronDown size={14} />
-                  </button>
-                </div>
+                ))
+              ) : (
+                <div className="p-3 text-[11px] text-slate-400 text-center">Geen acteurs gevonden.</div>
               )
-            })}
+            ) : (
+              rankedActeursVoorContext.slice(0, 8).map((acteur, i) => {
+                const isGekozen = geselecteerdeActeur?.id === acteur.id
+                const isExpanded = expandedActorInDropdown === acteur.id
+                return (
+                  <div key={acteur.id} className="rounded-xl overflow-hidden">
+                    <div
+                      className={`w-full flex items-center gap-2.5 p-1.5 transition-colors group cursor-pointer ${isExpanded ? "bg-indigo-50" : isGekozen ? "bg-indigo-50" : "hover:bg-indigo-50"}`}
+                      onClick={() => setExpandedActorInDropdown(isExpanded ? null : acteur.id)}
+                    >
+                      <span className="text-[10px] font-bold text-slate-400 font-mono w-4 text-right shrink-0">{i + 1}</span>
+                      <div className="w-7 h-7 rounded-lg bg-slate-100 text-slate-600 border border-slate-200 flex items-center justify-center font-extrabold font-mono text-[10px] shrink-0 overflow-hidden group-hover:scale-105 transition-transform">
+                        <TmdbAvatar name={acteur.name} initials={acteur.initials} />
+                      </div>
+                      <span className="text-xs font-bold text-slate-800 truncate group-hover:text-indigo-700 transition-colors flex-1">{acteur.name}</span>
+                      {isGekozen && !isExpanded && <Check size={14} className="text-indigo-600 shrink-0" />}
+                      <ChevronDown size={14} className={`text-slate-400 shrink-0 transition-transform duration-200 ${isExpanded ? "rotate-180" : ""}`} />
+                    </div>
+                    {isExpanded && (
+                      <div className="px-3 pb-3 pt-2 bg-indigo-50/70 border-t border-indigo-100 space-y-2">
+                        <div className="flex items-center gap-2.5">
+                          <div className="w-10 h-10 rounded-xl bg-indigo-200 text-indigo-900 border border-indigo-300 flex items-center justify-center font-extrabold font-mono text-sm shrink-0 overflow-hidden">
+                            <TmdbAvatar name={acteur.name} initials={acteur.initials} />
+                          </div>
+                          <div className="min-w-0">
+                            <p className="text-xs font-bold text-slate-800">{acteur.name}</p>
+                            <p className="text-[10px] text-slate-500 font-mono">{acteur.genre}{acteur.birthYear ? ` · ${acteur.birthYear}` : ""}</p>
+                          </div>
+                          <span className="ml-auto text-[11px] font-mono font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-100 shrink-0">{acteur.score}</span>
+                        </div>
+                        <p className="text-[10px] text-slate-500 leading-relaxed">{acteur.bio}</p>
+                        <button
+                          onClick={(e) => { e.stopPropagation(); setSearchedSuitableActor(null); setSelectedSuitableActorId(acteur.id); setExpandedActorInDropdown(null); setShowMoreActors(false) }}
+                          className="w-full py-1.5 text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg transition-colors"
+                        >
+                          {isGekozen ? "Geselecteerd" : "Selecteer"}
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                )
+              })
+            )}
           </div>
         </div>
       )}
