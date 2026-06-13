@@ -164,7 +164,7 @@ export default function CanaryDashboard() {
 
   // Filter State
   const [productionType, setProductionType] = React.useState<string>("all")
-  const [selectedGenre, setSelectedGenre] = React.useState<string | null>(null)
+  const [selectedGenres, setSelectedGenres] = React.useState<string[]>([])
   const [budgetRange, setBudgetRange] = React.useState<[number, number]>([1_000_000, 1_000_000_000])
   const [budgetCeiling, setBudgetCeiling] = React.useState<number>(1_000_000_000)
   const [budgetInputMax, setBudgetInputMax] = React.useState<string>(formatBudget(1_000_000_000))
@@ -247,10 +247,12 @@ export default function CanaryDashboard() {
       return p;
     }
 
+    // Voor acteur/regisseur-aanbevelingen: gebruik het enige genre, of geen filter bij meerdere
+    const focusGenre = selectedGenres.length === 1 ? selectedGenres[0] : null;
+
     async function fetchActorsAndDirector() {
       const p = filterParams();
-
-      if (selectedGenre) p.set('genre', selectedGenre);
+      if (focusGenre) p.set('genre', focusGenre);
 
       try {
         const actorsUrl = new URL('/api/actors', window.location.origin);
@@ -258,7 +260,7 @@ export default function CanaryDashboard() {
         const actorsRes = await fetch(actorsUrl.toString());
         if (actorsRes.ok && !cancelled) {
           const data = await actorsRes.json();
-          if (selectedGenre) setGenreActors(data);
+          if (focusGenre) setGenreActors(data);
           else { setAllActors(data); setGenreActors(null); }
         }
       } catch (error) {
@@ -267,7 +269,7 @@ export default function CanaryDashboard() {
 
       const dp = filterParams();
       dp.set('limit', '8');
-      if (selectedGenre) dp.set('genre', selectedGenre);
+      if (focusGenre) dp.set('genre', focusGenre);
       try {
         const dirUrl = new URL('/api/directors', window.location.origin);
         dirUrl.search = dp.toString();
@@ -283,7 +285,7 @@ export default function CanaryDashboard() {
 
     fetchActorsAndDirector();
     return () => { cancelled = true; };
-  }, [selectedGenre, yearRange, budgetRange, refreshKey]);
+  }, [selectedGenres, yearRange, budgetRange, refreshKey]);
 
   React.useEffect(() => {
     const query = actorSearchQuery.trim();
@@ -298,7 +300,7 @@ export default function CanaryDashboard() {
       try {
         const url = new URL('/api/actors', window.location.origin);
         url.searchParams.set('search', query);
-        if (selectedGenre) url.searchParams.set('genre', selectedGenre);
+        if (selectedGenres.length === 1) url.searchParams.set('genre', selectedGenres[0]);
         const res = await fetch(url.toString());
         if (res.ok) {
           setActorSearchResults(await res.json());
@@ -311,7 +313,7 @@ export default function CanaryDashboard() {
     }, 300);
 
     return () => clearTimeout(timeout);
-  }, [actorSearchQuery, selectedGenre]);
+  }, [actorSearchQuery, selectedGenres]);
 
   React.useEffect(() => {
     const delayDebounceFn = setTimeout(async () => {
@@ -319,7 +321,7 @@ export default function CanaryDashboard() {
       try {
         const url = new URL('/api/catalog', window.location.origin);
         url.searchParams.append('type', productionType);
-        url.searchParams.append('genre', selectedGenre || 'all');
+        selectedGenres.forEach(g => url.searchParams.append('genre', g));
         url.searchParams.append('minBudget', Math.round(budgetRange[0] / 1_000_000).toString());
         url.searchParams.append('maxBudget', Math.round(budgetRange[1] / 1_000_000).toString());
         url.searchParams.append('startYear', yearRange[0].toString());
@@ -338,7 +340,7 @@ export default function CanaryDashboard() {
         }));
         setMasterCatalog(cleanMovies);
 
-        const catalogKey = `${selectedGenre ?? 'all'}-${yearRange[0]}-${yearRange[1]}`;
+        const catalogKey = `${selectedGenres.join(',') || 'all'}-${yearRange[0]}-${yearRange[1]}`;
         if (prevCatalogKey.current !== catalogKey) {
           prevCatalogKey.current = catalogKey;
           const top = [...cleanMovies].sort((a: any, b: any) =>
@@ -359,7 +361,7 @@ export default function CanaryDashboard() {
     }, 400); 
 
     return () => clearTimeout(delayDebounceFn);
-  }, [productionType, selectedGenre, budgetRange, yearRange, selectedActorFilter]);
+  }, [productionType, selectedGenres, budgetRange, yearRange, selectedActorFilter]);
 
   React.useEffect(() => {
     function handleOutsideClick(event: MouseEvent) {
@@ -439,11 +441,24 @@ export default function CanaryDashboard() {
     setShowMoreDirectors(true)
   }
 
-  const handleGenreChange = (genre: string | null) => {
+  const handleGenreToggle = (genre: string) => {
+    setSelectedGenres(prev =>
+      prev.includes(genre) ? prev.filter(g => g !== genre) : [...prev, genre]
+    )
+    setPopupContent(null)
+    setShowMoreActors(false)
+    setShowMoreDirectors(false)
+    setSelectedActorFilter(null)
+    setSelectedSuitableActorId(null)
+    setSelectedSuitableDirectorId(null)
+    setSearchedSuitableActor(null)
+  }
+
+  const handleGenreReset = () => {
     setBudgetRange([1_000_000, 1_000_000_000])
     setBudgetCeiling(1_000_000_000)
     setBudgetInputMax(formatBudget(1_000_000_000))
-    setSelectedGenre(genre)
+    setSelectedGenres([])
     setPopupContent(null)
     setShowMoreActors(false)
     setShowMoreDirectors(false)
@@ -496,30 +511,40 @@ export default function CanaryDashboard() {
   }, [masterCatalog])
 
   const selectedGenreSummary = React.useMemo(() => {
-    const effectiveGenre = selectedGenre || searchedSuitableActor?.genre || null
-    if (!effectiveGenre) return null
+    // Actieve genres: geselecteerde genres OF het genre van de gezochte acteur
+    const effectiveGenres = selectedGenres.length > 0
+      ? selectedGenres
+      : searchedSuitableActor?.genre ? [searchedSuitableActor.genre] : []
 
-    const matchedRankedGenre = rankedGenres.find((g) => g.name === effectiveGenre)
-    const exactWinstM = matchedRankedGenre ? matchedRankedGenre.value : 0
+    if (effectiveGenres.length === 0) return null
 
-    const stat = genreStats.find((g) => g.name === effectiveGenre)
-    const movies = processedAnalytics.rankedMovies.filter((m) => m.genre === effectiveGenre)
+    const matchingStats = effectiveGenres
+      .map(g => genreStats.find(s => s.name === g))
+      .filter((s): s is GenreInfo => !!s && s.titleCount > 0)
 
-    const validImdbMovies = movies.filter(m => m.imdbRating && !isNaN(Number(m.imdbRating)))
-    const avgImdb = validImdbMovies.length > 0
-      ? (validImdbMovies.reduce((sum, m) => sum + Number(m.imdbRating), 0) / validImdbMovies.length).toFixed(1)
-      : "N/A"
+    if (matchingStats.length === 0) return null
 
-    if (!stat || stat.titleCount === 0) return null
+    // Gecombineerde statistieken over alle geselecteerde genres
+    const totalTitles = matchingStats.reduce((sum, s) => sum + s.titleCount, 0)
+    const avgWinstM = Math.round(
+      (matchingStats.reduce((sum, s) => sum + (rankedGenres.find(r => r.name === s.name)?.value ?? 0), 0) / matchingStats.length) * 10
+    ) / 10
+    const durStats = matchingStats.filter(s => s.avgDuration != null)
+    const avgDuration = durStats.length > 0
+      ? Math.round(durStats.reduce((sum, s) => sum + s.avgDuration!, 0) / durStats.length)
+      : null
+
+    const label = effectiveGenres.length === 1
+      ? effectiveGenres[0]
+      : `${effectiveGenres.length} genres`
 
     return {
-      name: effectiveGenre,
-      avgWinstM: exactWinstM,
-      avgDuration: stat.avgDuration,
-      titleCount: stat.titleCount,
-      avgImdb
+      name: label,
+      avgWinstM,
+      avgDuration,
+      titleCount: totalTitles,
     }
-  }, [selectedGenre, searchedSuitableActor, processedAnalytics.rankedMovies, genreStats, rankedGenres])
+  }, [selectedGenres, searchedSuitableActor, genreStats, rankedGenres])
 
   const displayedMovies = React.useMemo(() => {
     const query = filmSearchQuery.toLowerCase().trim()
@@ -549,9 +574,9 @@ export default function CanaryDashboard() {
   }, [topDirectors, selectedSuitableDirectorId])
 
   const rankedActeursVoorContext = React.useMemo<ActorInfo[]>(() => {
-    const source = selectedGenre ? (genreActors ?? []) : allActors
+    const source = selectedGenres.length === 1 ? (genreActors ?? []) : allActors
     return [...source].sort((a, b) => b.score - a.score)
-  }, [selectedGenre, genreActors, allActors])
+  }, [selectedGenres, genreActors, allActors])
 
   const geselecteerdeActeur = React.useMemo<ActorInfo | null>(() => {
     if (searchedSuitableActor) return searchedSuitableActor
@@ -572,7 +597,7 @@ export default function CanaryDashboard() {
     setPopupPosition({ x: targetX, y: e.pageY - 20 })
     
     const scoreVal = "score" in data ? data.score : undefined
-    const genreVal = "genre" in data && data.genre ? data.genre : (selectedGenre || "Algemeen")
+    const genreVal = "genre" in data && data.genre ? data.genre : (selectedGenres[0] || "Algemeen")
     const idVal = "id" in data ? data.id : undefined
     const birthYearVal = "birthYear" in data ? data.birthYear : undefined
     const deathYearVal = "deathYear" in data ? data.deathYear : undefined
@@ -685,20 +710,20 @@ export default function CanaryDashboard() {
         <div className="space-y-3">
           <div className="flex items-center justify-between px-1">
             <span className="text-xs font-bold text-slate-700 uppercase tracking-wider block">Kies een genre</span>
-            {selectedGenre && (
-              <button onClick={() => handleGenreChange(null)} className="text-[10px] bg-amber-100 text-amber-700 px-2 py-1 rounded-md font-bold hover:bg-amber-200 transition-colors">
-                Reset Filter
+            {selectedGenres.length > 0 && (
+              <button onClick={handleGenreReset} className="text-[10px] bg-amber-100 text-amber-700 px-2 py-1 rounded-md font-bold hover:bg-amber-200 transition-colors">
+                Reset ({selectedGenres.length})
               </button>
             )}
           </div>
 
           <div className="grid grid-cols-2 gap-2.5 max-h-[250px] overflow-y-auto pr-1 scrollbar-thin scrollbar-thumb-slate-200 scrollbar-track-transparent">
             {rankedGenres.map((genreItem) => {
-              const isSelected = genreItem.name === selectedGenre
+              const isSelected = selectedGenres.includes(genreItem.name)
               return (
                 <button
                   key={genreItem.name}
-                  onClick={() => handleGenreChange(isSelected ? null : genreItem.name)}
+                  onClick={() => handleGenreToggle(genreItem.name)}
                   className={`p-3 rounded-xl text-xs text-center transition-all duration-300 active:scale-95 border ${
                     isSelected
                       ? "bg-amber-50 border-amber-300 text-amber-900 font-bold shadow-sm"
@@ -803,7 +828,11 @@ export default function CanaryDashboard() {
                   <p className="text-xs font-bold text-indigo-700/80 uppercase font-mono tracking-wider flex items-center gap-1.5">
                     <Layers size={14} className="text-indigo-500" /> Genre
                   </p>
-                  <h2 className="text-2xl sm:text-3xl font-extrabold text-slate-900 mt-1">{genreNl(selectedGenreSummary.name)}</h2>
+                  <h2 className="text-2xl sm:text-3xl font-extrabold text-slate-900 mt-1">
+                    {selectedGenres.length > 1
+                      ? selectedGenres.map(genreNl).join(' · ')
+                      : genreNl(selectedGenreSummary.name)}
+                  </h2>
                   <span className="text-[11px] text-slate-500 font-medium mt-2 flex items-center gap-2">
                     <span>Overzicht van prestaties & statistieken</span>
                   </span>
@@ -970,10 +999,12 @@ export default function CanaryDashboard() {
               <h3 className="text-sm font-extrabold text-slate-900 uppercase tracking-wider flex items-center gap-2">
                 <Clapperboard size={16} className="text-indigo-500" /> 
                 {selectedActorFilter 
-                  ? `Films met ${selectedActorFilter.name}` 
-                  : selectedGenre 
-                    ? `Toplijst: ${selectedGenre}` 
-                    : "Best scorende films"
+                  ? `Films met ${selectedActorFilter.name}`
+                  : selectedGenres.length === 1
+                    ? `Toplijst: ${genreNl(selectedGenres[0])}`
+                    : selectedGenres.length > 1
+                      ? `Toplijst: ${selectedGenres.map(genreNl).join(', ')}`
+                      : "Best scorende films"
                 }
               </h3>
               <div className="flex items-center gap-2 mt-1">
@@ -1085,7 +1116,7 @@ export default function CanaryDashboard() {
                   const compactProfit = `€${(movie.nettoWinst / 1000000).toFixed(1)}M`
 
                   return (
-                    <div key={movie.id} className={`p-4 rounded-2xl border transition-all duration-300 flex flex-col group ${movie.genre === selectedGenre ? "border-indigo-200/60 bg-indigo-50/30 hover:border-indigo-300" : "border-slate-200/60 bg-white hover:border-slate-300 hover:shadow-md hover:-translate-y-0.5"}`}>
+                    <div key={movie.id} className={`p-4 rounded-2xl border transition-all duration-300 flex flex-col group ${selectedGenres.includes(movie.genre) ? "border-indigo-200/60 bg-indigo-50/30 hover:border-indigo-300" : "border-slate-200/60 bg-white hover:border-slate-300 hover:shadow-md hover:-translate-y-0.5"}`}>
                       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                         <div className="flex gap-4 truncate items-start">
                           <span className="text-xs font-bold text-slate-400 font-mono pt-1 min-w-[24px]">#{index + 1}</span>
@@ -1232,7 +1263,7 @@ export default function CanaryDashboard() {
       {showMoreActors && (
         <div ref={moreActorsRef} className="absolute w-[280px] bg-white/95 backdrop-blur-xl rounded-2xl border border-slate-200 p-3 shadow-2xl z-50 animate-in fade-in zoom-in-95 duration-200" style={{ top: moreActorsPosition.y, left: moreActorsPosition.x }}>
           <p className="text-[10px] font-bold text-slate-400 uppercase font-mono tracking-wider px-1 pb-2 mb-2 border-b border-slate-100">
-            Top acteurs{selectedGenre ? ` · ${genreNl(selectedGenre)}` : ""}
+            Top acteurs{selectedGenres.length === 1 ? ` · ${genreNl(selectedGenres[0])}` : selectedGenres.length > 1 ? ` · meerdere genres` : ""}
           </p>
 
           {/* Zoekbalk */}
@@ -1240,7 +1271,7 @@ export default function CanaryDashboard() {
             <Search className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-slate-400" />
             <input
               type="text"
-              placeholder={selectedGenre ? `Zoek in ${genreNl(selectedGenre)}...` : "Zoek acteur..."}
+              placeholder={selectedGenres.length === 1 ? `Zoek in ${genreNl(selectedGenres[0])}...` : "Zoek acteur..."}
               value={actorSearchQuery}
               onChange={(e) => setActorSearchQuery(e.target.value)}
               className="w-full pl-7 pr-3 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:border-indigo-400 focus:ring-1 focus:ring-indigo-500/20 transition-all"
@@ -1322,7 +1353,7 @@ export default function CanaryDashboard() {
       {showMoreDirectors && (
         <div ref={moreDirectorsRef} className="absolute w-[280px] bg-white/95 backdrop-blur-xl rounded-2xl border border-slate-200 p-3 shadow-2xl z-50 animate-in fade-in zoom-in-95 duration-200" style={{ top: moreDirectorsPosition.y, left: moreDirectorsPosition.x }}>
           <p className="text-[10px] font-bold text-slate-400 uppercase font-mono tracking-wider px-1 pb-2 mb-2 border-b border-slate-100">
-            Top regisseurs{selectedGenre ? ` · ${genreNl(selectedGenre)}` : ""}
+            Top regisseurs{selectedGenres.length === 1 ? ` · ${genreNl(selectedGenres[0])}` : selectedGenres.length > 1 ? ` · meerdere genres` : ""}
           </p>
           <div className="space-y-1 max-h-[320px] overflow-y-auto">
             {topDirectors.map((regisseur, i) => {

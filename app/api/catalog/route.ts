@@ -53,14 +53,22 @@ export async function GET(request: NextRequest) {
       params.push(type);
     }
 
-    // 4. Voeg Genre filter toe (via een efficiënte EXISTS subquery)
-    if (genre !== 'all') {
+    // 4. Voeg Genre filter toe — ondersteunt meerdere genres (OR-logica)
+    const genres = searchParams.getAll('genre').filter(g => g && g !== 'all');
+    if (genres.length === 1) {
       query += ` AND EXISTS (
-        SELECT 1 FROM title_genre tg2 
-        JOIN genre g2 ON tg2.genre_id = g2.genre_id 
+        SELECT 1 FROM title_genre tg2
+        JOIN genre g2 ON tg2.genre_id = g2.genre_id
         WHERE tg2.title_id = t.title_id AND g2.genre_name = ?
       )`;
-      params.push(genre);
+      params.push(genres[0]);
+    } else if (genres.length > 1) {
+      query += ` AND EXISTS (
+        SELECT 1 FROM title_genre tg2
+        JOIN genre g2 ON tg2.genre_id = g2.genre_id
+        WHERE tg2.title_id = t.title_id AND g2.genre_name IN (${genres.map(() => '?').join(',')})
+      )`;
+      params.push(...genres);
     }
 
     // 4.5 Voeg Talent/Acteur filter toe indien geselecteerd
