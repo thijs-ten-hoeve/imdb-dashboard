@@ -198,6 +198,7 @@ export default function CanaryDashboard() {
   const [moreActorsPosition, setMoreActorsPosition] = React.useState<{ x: number; y: number }>({ x: 0, y: 0 })
   const moreActorsRef = React.useRef<HTMLDivElement>(null)
   const [selectedSuitableActorId, setSelectedSuitableActorId] = React.useState<string | null>(null)
+  const [searchedSuitableActor, setSearchedSuitableActor] = React.useState<ActorInfo | null>(null)
 
   React.useEffect(() => {
     const delayDebounceFn = setTimeout(async () => {
@@ -390,10 +391,13 @@ export default function CanaryDashboard() {
     setShowMoreActors(false)
     setSelectedActorFilter(null)
     setSelectedSuitableActorId(null)
+    setSearchedSuitableActor(null)
   }
 
   const selectActorSearchResult = (actor: ActorInfo) => {
     setSelectedActorFilter(actor)
+    setSearchedSuitableActor(actor)
+    setSelectedSuitableActorId(null)
     setActorSearchQuery("")
     setActorSearchResults(null)
   }
@@ -496,12 +500,13 @@ export default function CanaryDashboard() {
   }, [selectedGenre, genreActors, allActors])
 
   const geselecteerdeActeur = React.useMemo<ActorInfo | null>(() => {
+    if (searchedSuitableActor) return searchedSuitableActor
     if (selectedSuitableActorId) {
       const gekozen = rankedActeursVoorContext.find(a => a.id === selectedSuitableActorId)
       if (gekozen) return gekozen
     }
     return rankedActeursVoorContext[0] ?? null
-  }, [rankedActeursVoorContext, selectedSuitableActorId])
+  }, [rankedActeursVoorContext, selectedSuitableActorId, searchedSuitableActor])
 
   const openContextPopup = (e: React.MouseEvent, type: "actor" | "director", data: ActorInfo | DirectorInfo) => {
     e.stopPropagation()
@@ -1210,7 +1215,7 @@ export default function CanaryDashboard() {
                   className={`w-full flex items-center gap-2.5 p-1.5 rounded-xl transition-colors group ${isGekozen ? "bg-indigo-50" : "hover:bg-indigo-50"}`}
                 >
                   <button
-                    onClick={() => setSelectedSuitableActorId(acteur.id)}
+                    onClick={() => { setSearchedSuitableActor(null); setSelectedSuitableActorId(acteur.id) }}
                     title="Maak geschikte acteur"
                     className="flex items-center gap-2.5 flex-1 min-w-0 text-left"
                   >
