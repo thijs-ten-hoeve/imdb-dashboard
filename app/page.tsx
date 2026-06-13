@@ -537,21 +537,25 @@ export default function CanaryDashboard() {
     // Gewogen statistieken (gewogen naar titleCount per genre)
     const totalTitles = matchingStats.reduce((sum, s) => sum + s.titleCount, 0)
 
-    // Gebruik echte revenue/budget ratio, gecorrigeerd voor survivorship bias:
-    // rawRatio = avg van films MÉT revenue-data (opgeblazen door selectiebias)
-    // coverage = aandeel films dat revenue-data heeft (bijv. 0.25 = 25% had meetbare omzet)
-    // adjustedRatio = rawRatio × coverage → behoudt differentiatie per genre
+    // Gebruik ratio relatief aan het genre-gemiddelde (coverage is altijd 1 in deze DB,
+    // want title_financials bevat alleen films met bekende revenue — geen correctie nodig).
+    // Formule: winst = budget × 0.15 × (genreRatio / globaalGemiddeldeRatio)
+    // → gemiddeld genre geeft 15% winst op budget; beter/slechter genre geeft meer/minder.
+    const allRatioStats = genreStats.filter(s => s.avgRevBudgetRatio != null && s.titleCount > 0)
+    const allTitles = allRatioStats.reduce((sum, s) => sum + s.titleCount, 0)
+    const globalRatio = allTitles > 0
+      ? allRatioStats.reduce((sum, s) => sum + s.avgRevBudgetRatio! * s.titleCount, 0) / allTitles
+      : 3.0
+
     const ratioStats = matchingStats.filter(s => s.avgRevBudgetRatio != null)
     const ratioTitles = ratioStats.reduce((sum, s) => sum + s.titleCount, 0)
-    const rawRatio = ratioTitles > 0
+    const selectedRatio = ratioTitles > 0
       ? ratioStats.reduce((sum, s) => sum + s.avgRevBudgetRatio! * s.titleCount, 0) / ratioTitles
-      : 1.0
-    const avgCoverage = ratioTitles > 0
-      ? ratioStats.reduce((sum, s) => sum + (s.revenueCoverage ?? 0) * s.titleCount, 0) / ratioTitles
-      : 0.25
-    const adjustedRatio = Math.min(rawRatio * avgCoverage, 2.0)
+      : globalRatio
+
     const maxBudgetM = budgetRange[1] / 1_000_000
-    const baseWinstM = Math.round(maxBudgetM * (adjustedRatio - 1) * 10) / 10
+    const BASE_PROFIT = 0.15 // gemiddeld genre geeft 15% winst op max budget
+    const baseWinstM = Math.round(maxBudgetM * BASE_PROFIT * (selectedRatio / globalRatio) * 10) / 10
 
     // Risicokorting: elk genre boven de 2 kost 10% winst (max 50%)
     const extraGenres = Math.max(0, effectiveGenres.length - 2)
