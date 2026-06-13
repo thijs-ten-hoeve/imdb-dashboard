@@ -437,22 +437,23 @@ export default function CanaryDashboard() {
   }, [masterCatalog])
 
   const selectedGenreSummary = React.useMemo(() => {
-    if (!selectedGenre) return null
+    const effectiveGenre = selectedGenre || searchedSuitableActor?.genre || null
+    if (!effectiveGenre) return null
 
-    const matchedRankedGenre = rankedGenres.find((g) => g.name === selectedGenre)
+    const matchedRankedGenre = rankedGenres.find((g) => g.name === effectiveGenre)
     const exactWinstM = matchedRankedGenre ? matchedRankedGenre.value : 0
 
-    const movies = processedAnalytics.rankedMovies.filter((m) => m.genre === selectedGenre)
-    
+    const movies = processedAnalytics.rankedMovies.filter((m) => m.genre === effectiveGenre)
+
     if (movies.length > 0) {
       const totalDuration = movies.reduce((sum, m) => sum + m.durationMinutes, 0)
       const validImdbMovies = movies.filter(m => m.imdbRating && !isNaN(Number(m.imdbRating)))
-      const avgImdb = validImdbMovies.length > 0 
+      const avgImdb = validImdbMovies.length > 0
         ? (validImdbMovies.reduce((sum, m) => sum + Number(m.imdbRating), 0) / validImdbMovies.length).toFixed(1)
         : "N/A"
 
       return {
-        name: selectedGenre,
+        name: effectiveGenre,
         avgWinstM: exactWinstM,
         avgDuration: Math.round(totalDuration / movies.length),
         titleCount: movies.length,
@@ -460,17 +461,17 @@ export default function CanaryDashboard() {
       }
     }
 
-    const stat = genreStats.find((g) => g.name === selectedGenre)
+    const stat = genreStats.find((g) => g.name === effectiveGenre)
     if (!stat || stat.titleCount === 0) return null
 
     return {
-      name: selectedGenre,
+      name: effectiveGenre,
       avgWinstM: exactWinstM,
       avgDuration: null,
       titleCount: stat.titleCount,
       avgImdb: "N/A"
     }
-  }, [selectedGenre, processedAnalytics.rankedMovies, genreStats, rankedGenres])
+  }, [selectedGenre, searchedSuitableActor, processedAnalytics.rankedMovies, genreStats, rankedGenres])
 
   const displayedMovies = React.useMemo(() => {
     const query = filmSearchQuery.toLowerCase().trim()
