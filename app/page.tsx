@@ -535,7 +535,7 @@ export default function CanaryDashboard() {
     const rawRatio = ratioTitles > 0
       ? ratioStats.reduce((sum, s) => sum + s.avgRevBudgetRatio! * s.titleCount, 0) / ratioTitles
       : 1.5
-    const weightedRatio = Math.min(rawRatio, 3.5) // cap: winst nooit meer dan 2.5× max budget
+    const weightedRatio = Math.min(rawRatio, 2.5) // cap: winst nooit meer dan 1.5× max budget
     const maxBudgetM = budgetRange[1] / 1_000_000
     const baseWinstM = Math.round(maxBudgetM * (weightedRatio - 1) * 10) / 10
 

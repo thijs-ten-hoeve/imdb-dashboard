@@ -125,7 +125,7 @@ export async function fetchGenreStatsForRange(
           AVG(bt.net_profit) AS avg_net_profit,
           AVG(bt.margin_pct) AS avg_margin_pct,
           AVG(bt.runtime_minutes) AS avg_duration,
-          AVG(CASE WHEN bt.revenue > 0 THEN bt.revenue / bt.budget ELSE NULL END) AS avg_rev_budget_ratio
+          AVG(CASE WHEN bt.revenue > 0 THEN bt.revenue / bt.budget ELSE 0 END) AS avg_rev_budget_ratio
         FROM genre g2
         JOIN title_genre tg ON g2.genre_id = tg.genre_id
         JOIN (
@@ -183,7 +183,7 @@ export async function fetchGenreStats(connection?: mysql.Connection): Promise<Ge
         SELECT
           tg.genre_id,
           AVG(t.runtime_minutes) AS avg_duration,
-          AVG(CASE WHEN f.revenue > 0 THEN f.revenue / f.budget ELSE NULL END) AS avg_rev_budget_ratio
+          AVG(CASE WHEN f.revenue > 0 THEN f.revenue / f.budget ELSE 0 END) AS avg_rev_budget_ratio
         FROM title_genre tg
         JOIN title t ON tg.title_id = t.title_id
         JOIN title_financials f ON t.title_id = f.title_id AND f.budget >= ?
