@@ -1110,13 +1110,17 @@ export default function CanaryDashboard() {
                               <span className="font-sans font-bold text-indigo-800 bg-indigo-100/50 px-2 py-0.5 rounded-md border border-indigo-100">{movie.genre}</span>
                               <span className="bg-slate-100 px-2 py-0.5 rounded-md text-slate-600 border border-slate-200/60">{movie.type}</span>
                               {liveImdbRating && (
-                                <span className="flex items-center gap-1.5">
-                                  <svg width="32" height="16" viewBox="0 0 32 16" xmlns="http://www.w3.org/2000/svg" aria-label="IMDb">
-                                    <rect width="32" height="16" rx="2.5" fill="#F5C518"/>
-                                    <text x="16" y="11.5" fontSize="9.5" fontWeight="800" textAnchor="middle" fontFamily="Arial Black,Arial,sans-serif" fill="#000000" letterSpacing="-0.3">IMDb</text>
+                                <a
+                                  href={`https://www.imdb.com/title/${movie.id}/`}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="flex items-center"
+                                >
+                                  <svg xmlns="http://www.w3.org/2000/svg" aria-label="IMDb" viewBox="0 0 62 16" width="62" height="16" style={{ display: 'block' }}>
+                                    <rect width="62" height="16" rx="2.5" fill="#F5C518"/>
+                                    <text x="31" y="11.5" fontSize="9.5" fontWeight="800" textAnchor="middle" fontFamily="Arial Black,Arial,sans-serif" fill="#000000" letterSpacing="-0.2">{liveImdbRating} IMDb</text>
                                   </svg>
-                                  <span className="font-bold text-slate-700">{liveImdbRating}</span>
-                                </span>
+                                </a>
                               )}
                               <span className="font-semibold text-slate-600">{movie.year}</span>
                               <span className="flex items-center gap-1 font-semibold text-slate-600"><Clock size={10} /> {movie.durationMinutes} min</span>
