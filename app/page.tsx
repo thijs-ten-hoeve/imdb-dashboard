@@ -527,12 +527,17 @@ export default function CanaryDashboard() {
     // Gewogen statistieken (gewogen naar titleCount per genre)
     const totalTitles = matchingStats.reduce((sum, s) => sum + s.titleCount, 0)
 
-    const avgWinstM = Math.round(
+    const baseWinstM = Math.round(
       (matchingStats.reduce((sum, s) => {
         const winstM = rankedGenres.find(r => r.name === s.name)?.value ?? 0
         return sum + winstM * s.titleCount
       }, 0) / totalTitles) * 10
     ) / 10
+
+    // Risicokorting: elk genre boven de 2 kost 10% winst (max 50%)
+    const extraGenres = Math.max(0, effectiveGenres.length - 2)
+    const risicoKorting = Math.min(0.5, extraGenres * 0.10)
+    const avgWinstM = Math.round(baseWinstM * (1 - risicoKorting) * 10) / 10
 
     const durStats = matchingStats.filter(s => s.avgDuration != null)
     const durTitles = durStats.reduce((sum, s) => sum + s.titleCount, 0)
@@ -547,6 +552,7 @@ export default function CanaryDashboard() {
     return {
       name: label,
       avgWinstM,
+      risicoKorting,
       avgDuration,
       titleCount: totalTitles,
     }
@@ -850,7 +856,12 @@ export default function CanaryDashboard() {
               {selectedGenreSummary && (
                 <>
                   <div className="bg-white/90 border border-indigo-100 rounded-2xl px-4 py-2.5 shadow-sm shrink-0">
-                    <p className="text-[10px] font-bold text-slate-400 uppercase font-mono tracking-wide">Gem. winst</p>
+                    <p className="text-[10px] font-bold text-slate-400 uppercase font-mono tracking-wide flex items-center gap-1">
+                      Gem. winst
+                      {selectedGenreSummary.risicoKorting > 0 && (
+                        <span className="text-orange-500 font-bold">−{Math.round(selectedGenreSummary.risicoKorting * 100)}% risico</span>
+                      )}
+                    </p>
                     <p className="text-xl font-extrabold text-indigo-600 font-mono mt-0.5">€{selectedGenreSummary.avgWinstM}M</p>
                   </div>
                   <div className="bg-white/90 border border-slate-200 rounded-2xl px-4 py-2.5 shadow-sm shrink-0">
