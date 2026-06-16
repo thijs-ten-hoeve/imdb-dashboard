@@ -736,6 +736,7 @@ export default function CanaryDashboard() {
               <div className="font-black">Canary</div>
               <div className="font-normal">Productions</div>
             </h2>
+            <p className="text-slate-500 text-[11px] font-medium tracking-wide uppercase mt-0.5 font-mono">Prestatiepredictor</p>
           </div>
         </div>
 
