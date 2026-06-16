@@ -856,7 +856,7 @@ export default function CanaryDashboard() {
               <label className="text-[11px] font-bold text-slate-700 uppercase flex items-center gap-1.5">
                 <Calendar size={14} className="text-amber-500" /> Periode
               </label>
-              <span className="text-[11px] font-bold text-slate-700 font-mono bg-white px-2 py-0.5 rounded-md border border-slate-200 shadow-sm">
+              <span className="text-[11px] font-bold text-indigo-700 font-mono bg-white px-2 py-0.5 rounded-md border border-slate-200 shadow-sm">
                 {yearRange[0]} - {yearRange[1]}
               </span>
             </div>
