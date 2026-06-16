@@ -700,16 +700,11 @@ export default function CanaryDashboard() {
     return (
       <div className={`${sansFont.variable} font-sans flex h-screen w-full flex-col items-center justify-center bg-slate-50`}>
         <div className="flex flex-col items-center gap-6 animate-in fade-in zoom-in-95 duration-500">
-          <div className="p-5 bg-gradient-to-br from-amber-400 to-amber-500 rounded-3xl shadow-xl shadow-amber-500/20 ring-1 ring-amber-400">
-            <Clapperboard size={40} className="text-slate-950 animate-pulse" />
-          </div>
+          <div className="w-12 h-12 border-4 border-slate-200 border-t-indigo-600 rounded-full animate-spin"></div>
           <div className="text-center space-y-3">
             <h2 className="text-xs font-extrabold tracking-[0.2em] text-slate-800 uppercase">
               Database Indexeren
             </h2>
-            <div className="w-56 h-1.5 bg-slate-200/80 rounded-full overflow-hidden shadow-inner relative">
-              <div className="absolute top-0 left-0 h-full bg-gradient-to-r from-amber-400 to-amber-600 w-full animate-[pulse_1.5s_ease-in-out_infinite] origin-left scale-x-50"></div>
-            </div>
           </div>
         </div>
       </div>
