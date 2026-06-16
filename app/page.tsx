@@ -163,7 +163,7 @@ export default function CanaryDashboard() {
   const [refreshKey, setRefreshKey] = React.useState(0)
 
   // Filter State
-  const [selectedTypes, setSelectedTypes] = React.useState<string[]>([])
+  const [selectedTypes, setSelectedTypes] = React.useState<string[]>(["movie"])
   const [selectedGenres, setSelectedGenres] = React.useState<string[]>([])
   const [budgetRange, setBudgetRange] = React.useState<[number, number]>([1_000_000, 1_000_000_000])
   const [budgetCeiling, setBudgetCeiling] = React.useState<number>(1_000_000_000)
