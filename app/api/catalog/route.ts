@@ -7,7 +7,6 @@ export async function GET(request: NextRequest) {
   try {
     // 1. Lees de filters uit de URL (met veilige fallbacks)
     const searchParams = request.nextUrl.searchParams;
-    const type = searchParams.get('type') || 'all';
     const genre = searchParams.get('genre') || 'all';
     const talentId = searchParams.get('talentId') || 'all';
     const minBudget = parseInt(searchParams.get('minBudget') || '0', 10) * 1000000;
@@ -47,10 +46,14 @@ export async function GET(request: NextRequest) {
     // Arrays met parameters voor de '?' plekken
     const params: any[] = [startYear, endYear, minBudget, maxBudget];
 
-    // 3. Voeg Type filter toe indien geselecteerd
-    if (type !== 'all') {
+    // 3. Voeg Type filter toe — ondersteunt meerdere types (OR-logica)
+    const types = searchParams.getAll('type').filter(t => t && t !== 'all');
+    if (types.length === 1) {
       query += ` AND c.content_type_name = ?`;
-      params.push(type);
+      params.push(types[0]);
+    } else if (types.length > 1) {
+      query += ` AND c.content_type_name IN (${types.map(() => '?').join(',')})`;
+      params.push(...types);
     }
 
     // 4. Voeg Genre filter toe — ondersteunt meerdere genres (OR-logica)

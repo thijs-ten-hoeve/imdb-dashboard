@@ -16,9 +16,6 @@ import { Card } from "@/components/ui/card"
 import { Slider } from "@/components/ui/slider"
 import { genreNl } from "@/lib/genres-nl"
 import { Input } from "@/components/ui/input"
-import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
-} from "@/components/ui/select"
 
 const sansFont = Inter({ subsets: ["latin"], variable: "--font-sans" })
 const monoFont = JetBrains_Mono({ subsets: ["latin"], variable: "--font-mono" })
@@ -166,7 +163,7 @@ export default function CanaryDashboard() {
   const [refreshKey, setRefreshKey] = React.useState(0)
 
   // Filter State
-  const [productionType, setProductionType] = React.useState<string>("all")
+  const [selectedTypes, setSelectedTypes] = React.useState<string[]>([])
   const [selectedGenres, setSelectedGenres] = React.useState<string[]>([])
   const [budgetRange, setBudgetRange] = React.useState<[number, number]>([1_000_000, 1_000_000_000])
   const [budgetCeiling, setBudgetCeiling] = React.useState<number>(1_000_000_000)
@@ -338,7 +335,7 @@ export default function CanaryDashboard() {
       setIsFiltering(true);
       try {
         const url = new URL('/api/catalog', window.location.origin);
-        url.searchParams.append('type', productionType);
+        selectedTypes.forEach(t => url.searchParams.append('type', t));
         selectedGenres.forEach(g => url.searchParams.append('genre', g));
         url.searchParams.append('minBudget', Math.round(budgetRange[0] / 1_000_000).toString());
         url.searchParams.append('maxBudget', Math.round(budgetRange[1] / 1_000_000).toString());
@@ -366,7 +363,7 @@ export default function CanaryDashboard() {
     }, 400); 
 
     return () => clearTimeout(delayDebounceFn);
-  }, [productionType, selectedGenres, budgetRange, yearRange, selectedActorFilter]);
+  }, [selectedTypes, selectedGenres, budgetRange, yearRange, selectedActorFilter]);
 
   React.useEffect(() => {
     function handleOutsideClick(event: MouseEvent) {
@@ -744,23 +741,42 @@ export default function CanaryDashboard() {
 
 
         {/* Type Media Filter */}
-        <div className="space-y-3 bg-slate-50/50 p-4 rounded-2xl border border-slate-200/60 shadow-sm transition-all hover:border-slate-300/80">
-          <div>
+        <div className="space-y-3">
+          <div className="flex items-center justify-between px-1">
             <label className="text-[11px] font-bold text-slate-700 uppercase tracking-wider flex items-center gap-1.5">
               <Layers size={14} className="text-amber-500" /> Type Media
             </label>
+            {selectedTypes.length > 0 && (
+              <button onClick={() => setSelectedTypes([])} className="text-[10px] bg-amber-100 text-amber-700 px-2 py-1 rounded-md font-bold hover:bg-amber-200 transition-colors">
+                Reset ({selectedTypes.length})
+              </button>
+            )}
           </div>
-          <Select value={productionType} onValueChange={setProductionType}>
-            <SelectTrigger className="bg-white border-slate-200 text-slate-800 h-10 text-xs rounded-xl shadow-sm hover:border-indigo-400 focus:ring-indigo-500/20">
-              <SelectValue placeholder="Selecteer Type" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Alle Vormen</SelectItem>
-              <SelectItem value="movie">Speelfilms</SelectItem>
-              <SelectItem value="tvSeries">Televisieseries</SelectItem>
-              <SelectItem value="documentary">Documentaires</SelectItem>
-            </SelectContent>
-          </Select>
+
+          <div className="grid grid-cols-2 gap-2.5">
+            {[
+              { value: "movie", label: "Speelfilms" },
+              { value: "tvSeries", label: "Televisieseries" },
+              { value: "documentary", label: "Documentaires" },
+            ].map((typeItem) => {
+              const isSelected = selectedTypes.includes(typeItem.value)
+              return (
+                <button
+                  key={typeItem.value}
+                  onClick={() => setSelectedTypes(prev =>
+                    prev.includes(typeItem.value) ? prev.filter(t => t !== typeItem.value) : [...prev, typeItem.value]
+                  )}
+                  className={`p-3 rounded-xl text-xs text-center transition-all duration-300 active:scale-95 border ${
+                    isSelected
+                      ? "bg-amber-50 border-amber-300 text-amber-900 font-bold shadow-sm"
+                      : "bg-white border-slate-200 text-slate-600 hover:border-amber-200 hover:shadow-sm hover:text-slate-800"
+                  }`}
+                >
+                  <span className="block truncate">{typeItem.label}</span>
+                </button>
+              )
+            })}
+          </div>
         </div>
 
         {/* Genre Filter */}
