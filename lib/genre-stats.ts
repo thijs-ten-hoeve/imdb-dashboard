@@ -150,6 +150,7 @@ export async function fetchGenreStatsForRange(
         ) bt ON bt.title_id = tg.title_id
         GROUP BY g2.genre_id
       ) stats ON stats.genre_id = g.genre_id
+      WHERE g.genre_name NOT IN ('Film-Noir', 'News')
       ORDER BY avgNetProfit DESC, g.genre_name ASC;
     `, [MIN_BUDGET, startYear, endYear]);
 
@@ -202,6 +203,7 @@ export async function fetchGenreStats(connection?: mysql.Connection): Promise<Ge
         WHERE t.runtime_minutes IS NOT NULL AND t.runtime_minutes > 0
         GROUP BY tg.genre_id
       ) dur ON dur.genre_id = g.genre_id
+      WHERE g.genre_name NOT IN ('Film-Noir', 'News')
       ORDER BY gs.avg_net_profit DESC, g.genre_name ASC;
     `, [MIN_BUDGET]);
 
