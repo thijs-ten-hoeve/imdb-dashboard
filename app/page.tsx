@@ -735,9 +735,9 @@ export default function CanaryDashboard() {
             />
           </div>
           <div>
-            <h2 className="text-base font-extrabold tracking-tight text-slate-900 uppercase">
-              <div>CANARY</div>
-              <div>PRODUCTIONS</div>
+            <h2 className="text-base font-extrabold tracking-tight text-slate-900 font-mono uppercase">
+              <div>Canary</div>
+              <div>Productions</div>
             </h2>
           </div>
         </div>
