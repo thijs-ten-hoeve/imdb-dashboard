@@ -817,12 +817,12 @@ export default function CanaryDashboard() {
         {/* Sliders Container */}
         <div className="space-y-4 pt-2">
           <div className="space-y-3 bg-slate-50/50 p-4 rounded-2xl border border-slate-200/60 shadow-sm transition-all hover:border-slate-300/80">
-            <label className="text-[11px] font-bold text-slate-700 uppercase flex items-center gap-1.5">
-              <DollarSign size={14} className="text-amber-500" /> Investeringsbudget
-            </label>
-            <div className="flex items-center gap-2">
-              <div className="flex items-center gap-1 flex-1 text-[11px] font-bold text-indigo-700 font-mono bg-white rounded-md border border-indigo-100 shadow-sm overflow-hidden">
-                <span className="pl-2 text-slate-400">€</span>
+            <div className="flex items-center justify-between">
+              <label className="text-[11px] font-bold text-slate-700 uppercase flex items-center gap-1.5">
+                <DollarSign size={14} className="text-amber-500" /> Investeringsbudget
+              </label>
+              <div className="flex items-center gap-1 text-[11px] font-bold text-indigo-700 font-mono bg-white px-2 py-0.5 rounded-md border border-slate-200 shadow-sm">
+                <span className="text-slate-400">€</span>
                 <input
                   type="text"
                   inputMode="numeric"
@@ -834,7 +834,7 @@ export default function CanaryDashboard() {
                     setBudgetInputMax(formatBudget(val))
                   }}
                   onKeyDown={(e) => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur() }}
-                  className="w-full pr-2 py-0.5 text-right bg-transparent focus:outline-none"
+                  className="w-12 text-right bg-transparent focus:outline-none"
                 />
               </div>
             </div>
