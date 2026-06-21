@@ -21,7 +21,8 @@ const sansFont = Inter({ subsets: ["latin"], variable: "--font-sans" })
 const monoFont = JetBrains_Mono({ subsets: ["latin"], variable: "--font-mono" })
 
 // --- TMDB Configuratie & Avatar Component ---
-const TMDB_API_KEY = "ce19ec38146a5d1bf2a186ae9a5f582d"
+// Key komt uit .env.local (NEXT_PUBLIC_ omdat de fetch client-side draait).
+const TMDB_API_KEY = process.env.NEXT_PUBLIC_TMDB_API_KEY
 
 function TmdbAvatar({ name, initials }: { name: string; initials: string }) {
   const [imgUrl, setImgUrl] = React.useState<string | null>(null)
@@ -36,6 +37,7 @@ function TmdbAvatar({ name, initials }: { name: string; initials: string }) {
     }
 
     async function fetchImage() {
+      if (!TMDB_API_KEY) return
       try {
         const res = await fetch(`https://api.themoviedb.org/3/search/person?query=${encodeURIComponent(name)}&api_key=${TMDB_API_KEY}&include_adult=false`)
         if (!res.ok) return
