@@ -42,9 +42,9 @@ export async function GET(request: NextRequest) {
       database: process.env.DB_DATABASE || 'imdb_project',
     });
 
-    // Regisseur(s) van de titel
+    // Regisseur(s) van de titel — DISTINCT voorkomt dubbele namen
     const [directorRows] = await connection.execute(
-      `SELECT n.talent_id AS id, n.talent_name AS name
+      `SELECT DISTINCT n.talent_id AS id, n.talent_name AS name
        FROM title_director td
        JOIN talent n ON td.talent_id = n.talent_id
        WHERE td.title_id = ?
@@ -52,7 +52,8 @@ export async function GET(request: NextRequest) {
       [titleId]
     );
 
-    // Hoofdcast: acteurs/actrices, beste rol eerst op basis van credit-volgorde (ord)
+    // Hoofdcast: acteurs/actrices, beste rol eerst op basis van credit-volgorde (ord).
+    // Ruim genomen, want dezelfde acteur kan meerdere rollen hebben (meerdere rijen).
     const [castRows] = await connection.execute(
       `SELECT n.talent_id AS id, n.talent_name AS name, tp.characters AS characters
        FROM title_principal tp
@@ -60,23 +61,43 @@ export async function GET(request: NextRequest) {
        JOIN category c ON tp.category_id = c.category_id
        WHERE tp.title_id = ? AND c.category_name IN ('actor', 'actress')
        ORDER BY tp.ord ASC
-       LIMIT 4`,
+       LIMIT 20`,
       [titleId]
     );
 
     await connection.end();
 
-    const directors = (directorRows as { id: string; name: string }[]).map(r => ({
-      id: r.id,
-      name: r.name,
-      initials: initialsFromName(r.name),
-    }));
+    // Regisseurs ontdubbelen op talent_id
+    const directorMap = new Map<string, { id: string; name: string; initials: string }>();
+    for (const r of directorRows as { id: string; name: string }[]) {
+      if (!directorMap.has(r.id)) {
+        directorMap.set(r.id, { id: r.id, name: r.name, initials: initialsFromName(r.name) });
+      }
+    }
+    const directors = Array.from(directorMap.values());
 
-    const cast = (castRows as { id: string; name: string; characters: string | null }[]).map(r => ({
-      id: r.id,
-      name: r.name,
-      initials: initialsFromName(r.name),
-      character: parseCharacters(r.characters),
+    // Cast ontdubbelen op talent_id: behoud de best gecrediteerde rij (laagste ord,
+    // = eerste in de gesorteerde lijst) en voeg eventuele extra rollen samen.
+    const castMap = new Map<string, { id: string; name: string; initials: string; characters: string[] }>();
+    for (const r of castRows as { id: string; name: string; characters: string | null }[]) {
+      const character = parseCharacters(r.characters);
+      const existing = castMap.get(r.id);
+      if (!existing) {
+        castMap.set(r.id, {
+          id: r.id,
+          name: r.name,
+          initials: initialsFromName(r.name),
+          characters: character ? [character] : [],
+        });
+      } else if (character && !existing.characters.includes(character)) {
+        existing.characters.push(character);
+      }
+    }
+    const cast = Array.from(castMap.values()).slice(0, 4).map(e => ({
+      id: e.id,
+      name: e.name,
+      initials: e.initials,
+      character: e.characters.length > 0 ? e.characters.join(', ') : null,
     }));
 
     return NextResponse.json({ directors, cast });
