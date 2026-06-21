@@ -5,7 +5,7 @@ import Image from "next/image"
 import {
   Calendar, Layers, DollarSign, Clapperboard, Clock,
   UserCheck, Search, X, Check, ChevronDown, Star, ExternalLink,
-  ArrowUp, ArrowDown, ArrowUpDown, TrendingUp, Info, Pencil, RefreshCw
+  ArrowUp, ArrowDown, ArrowUpDown, TrendingUp, Info, Pencil, Users
 } from "lucide-react"
 
 import {
@@ -159,8 +159,6 @@ export default function CanaryDashboard() {
   // Laad States
   const [isInitialLoading, setIsInitialLoading] = React.useState(true)
   const [isFiltering, setIsFiltering] = React.useState(false)
-  const [lastUpdated, setLastUpdated] = React.useState<Date | null>(null)
-  const [refreshKey, setRefreshKey] = React.useState(0)
 
   // Filter State
   const [selectedTypes, setSelectedTypes] = React.useState<string[]>(["movie"])
@@ -178,6 +176,16 @@ export default function CanaryDashboard() {
   const [selectedActorFilter, setSelectedActorFilter] = React.useState<ActorInfo | null>(null)
   const [actorMovies, setActorMovies] = React.useState<any[]>([])
   const [isActorMoviesLoading, setIsActorMoviesLoading] = React.useState(false)
+
+  // Regisseur + hoofdrol-popup voor een aangeklikte film
+  const [movieCredits, setMovieCredits] = React.useState<{
+    title: string
+    directors: { id: string; name: string; initials: string }[]
+    cast: { id: string; name: string; initials: string; character: string | null }[]
+  } | null>(null)
+  const [isCreditsLoading, setIsCreditsLoading] = React.useState(false)
+  const [creditsPosition, setCreditsPosition] = React.useState<{ x: number; y: number }>({ x: 0, y: 0 })
+  const creditsRef = React.useRef<HTMLDivElement>(null)
 
   const [actorSearchQuery, setActorSearchQuery] = React.useState<string>("")
   const [actorSearchResults, setActorSearchResults] = React.useState<ActorInfo[] | null>(null)
@@ -222,7 +230,6 @@ export default function CanaryDashboard() {
         const genresRes = await fetch(url.toString());
         if (genresRes.ok) {
           setGenreStats(await genresRes.json());
-          setLastUpdated(new Date());
         }
       } catch (error) {
         console.error("Fout bij ophalen genres:", error);
@@ -232,7 +239,7 @@ export default function CanaryDashboard() {
     }, 400);
 
     return () => clearTimeout(delayDebounceFn);
-  }, [yearRange, refreshKey]);
+  }, [yearRange]);
 
   // Pas het budget-plafond aan op het werkelijke max-budget van de geselecteerde genres.
   // Geen genre geselecteerd → plafond = hoogste max-budget over alle genres.
@@ -300,7 +307,7 @@ export default function CanaryDashboard() {
 
     fetchActorsAndDirector();
     return () => { cancelled = true; };
-  }, [selectedGenres, yearRange, budgetRange, refreshKey]);
+  }, [selectedGenres, yearRange, budgetRange]);
 
   React.useEffect(() => {
     const query = actorSearchQuery.trim();
@@ -374,6 +381,16 @@ export default function CanaryDashboard() {
     if (popupContent) document.addEventListener("click", handleOutsideClick)
     return () => document.removeEventListener("click", handleOutsideClick)
   }, [popupContent])
+
+  React.useEffect(() => {
+    function handleOutsideClick(event: MouseEvent) {
+      if (creditsRef.current && !creditsRef.current.contains(event.target as Node)) {
+        setMovieCredits(null)
+      }
+    }
+    if (movieCredits) document.addEventListener("click", handleOutsideClick)
+    return () => document.removeEventListener("click", handleOutsideClick)
+  }, [movieCredits])
 
   React.useEffect(() => {
     function handleOutsideClick(event: MouseEvent) {
@@ -688,6 +705,38 @@ export default function CanaryDashboard() {
     }
   }
 
+  // Open een popup met de regisseur en hoofdrolspeler(s) van de aangeklikte film
+  const openMovieCredits = (e: React.MouseEvent, movie: { id: string; title: string }) => {
+    e.stopPropagation()
+    e.nativeEvent.stopImmediatePropagation()
+
+    const screenWidth = window.innerWidth
+    let targetX = e.pageX + 12
+    if (targetX + 320 > screenWidth) targetX = screenWidth - 340
+    setCreditsPosition({ x: targetX, y: e.pageY + 12 })
+
+    setPopupContent(null)
+    setMovieCredits({ title: movie.title, directors: [], cast: [] })
+    setIsCreditsLoading(true)
+
+    fetch(`/api/titles/credits?titleId=${movie.id}`)
+      .then(res => {
+        if (!res.ok) {
+          return res.json().then(data => Promise.reject(new Error(data.error || "Fout bij ophalen")))
+        }
+        return res.json()
+      })
+      .then(data => {
+        setMovieCredits({ title: movie.title, directors: data.directors, cast: data.cast })
+      })
+      .catch(err => {
+        console.error("Fout bij ophalen regisseur en cast:", err.message || err)
+      })
+      .finally(() => {
+        setIsCreditsLoading(false)
+      })
+  }
+
 
   // Generate chart data formatting
   const chartDataFilms = displayedMovies.slice(0, 12).map((m) => ({
@@ -863,26 +912,6 @@ export default function CanaryDashboard() {
           </div>
         </div>
 
-        {/* Laatste update */}
-        <div className="mt-auto pt-4 border-t border-slate-100 flex items-center justify-between">
-          <div>
-            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Laatste update</p>
-            {lastUpdated && <p className="text-[10px] text-emerald-600 font-medium">Je hebt de laatste data.</p>}
-            <p className="text-[11px] font-mono text-slate-500 mt-0.5">
-              {lastUpdated
-                ? lastUpdated.toLocaleTimeString('nl-NL', { hour: '2-digit', minute: '2-digit' }) + ' ' +
-                  lastUpdated.toLocaleDateString('nl-NL', { weekday: 'short' })
-                : '—'}
-            </p>
-          </div>
-          <button
-            onClick={() => setRefreshKey(k => k + 1)}
-            title="Ververs data"
-            className="p-2 rounded-lg border border-slate-200 text-slate-400 hover:text-indigo-600 hover:border-indigo-300 hover:bg-indigo-50 transition-colors"
-          >
-            <RefreshCw size={13} />
-          </button>
-        </div>
       </aside>
 
       {/* 2. Rechter Canvas voor Inhoud */}
@@ -1223,7 +1252,7 @@ export default function CanaryDashboard() {
                             </div>
                           </div>
                         </div>
-                        <div className="flex items-center justify-between sm:justify-end gap-4 shrink-0">
+                        <div className="flex items-center justify-between sm:justify-end gap-3 shrink-0">
                           <div className="bg-slate-50 border border-slate-200 px-3 py-2 rounded-xl shadow-sm">
                             <div className="flex items-center gap-2 font-mono flex-wrap justify-end">
                               <span className="text-xs font-extrabold text-slate-700">{compactBudget}</span>
@@ -1234,6 +1263,13 @@ export default function CanaryDashboard() {
                               </span>
                             </div>
                           </div>
+                          <button
+                            onClick={(e) => openMovieCredits(e, movie)}
+                            title="Regisseur & hoofdrol bekijken"
+                            className="flex items-center gap-1.5 px-3 py-2 rounded-xl border border-slate-200 text-slate-500 hover:text-indigo-600 hover:border-indigo-300 hover:bg-indigo-50 transition-colors text-xs font-bold shrink-0"
+                          >
+                            <Users size={14} /> <span className="hidden lg:inline">Cast</span>
+                          </button>
                         </div>
                       </div>
                     </div>
@@ -1330,6 +1366,74 @@ export default function CanaryDashboard() {
                </button>
              </div>
            )}
+        </div>
+      )}
+
+      {movieCredits && (
+        <div ref={creditsRef} className="absolute w-[320px] bg-white/95 backdrop-blur-xl rounded-3xl border border-slate-200 p-5 shadow-2xl z-[60] animate-in fade-in zoom-in-95 duration-200" style={{ top: creditsPosition.y, left: creditsPosition.x }}>
+          <div className="flex items-start justify-between border-b border-slate-100 pb-3 mb-4">
+            <div className="truncate pr-2">
+              <p className="text-[10px] font-bold text-indigo-700/80 uppercase font-mono tracking-wider flex items-center gap-1.5">
+                <Clapperboard size={12} className="text-indigo-500" /> Regie &amp; Hoofdrol
+              </p>
+              <h3 className="font-extrabold text-slate-900 truncate text-sm mt-1">{movieCredits.title}</h3>
+            </div>
+            <button onClick={() => setMovieCredits(null)} className="text-slate-400 hover:text-slate-900 bg-slate-50 hover:bg-slate-100 p-1.5 rounded-xl shrink-0"><X size={16} /></button>
+          </div>
+
+          {isCreditsLoading ? (
+            <div className="space-y-2">
+              {[1, 2, 3].map(i => <div key={i} className="h-12 bg-slate-100 rounded-xl animate-pulse" />)}
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {/* Regisseur */}
+              <div>
+                <p className="text-[10px] font-bold text-slate-400 uppercase font-mono tracking-wider mb-1.5 flex items-center gap-1">
+                  <UserCheck size={12} className="text-indigo-500" /> Regisseur
+                </p>
+                {movieCredits.directors.length > 0 ? (
+                  <div className="space-y-1.5">
+                    {movieCredits.directors.map(d => (
+                      <div key={d.id} className="flex items-center gap-2.5 p-2 rounded-xl bg-slate-50 border border-slate-100">
+                        <div className="w-9 h-9 rounded-lg bg-indigo-950 text-white flex items-center justify-center overflow-hidden shrink-0 text-[10px] font-bold font-mono">
+                          <TmdbAvatar name={d.name} initials={d.initials} />
+                        </div>
+                        <span className="text-xs font-bold text-slate-800 truncate">{d.name}</span>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-[11px] text-slate-400 italic">Onbekend.</p>
+                )}
+              </div>
+
+              {/* Hoofdrol / beste acteurs */}
+              <div>
+                <p className="text-[10px] font-bold text-slate-400 uppercase font-mono tracking-wider mb-1.5 flex items-center gap-1">
+                  <Star size={12} className="text-indigo-500" /> Hoofdrol &amp; cast
+                </p>
+                {movieCredits.cast.length > 0 ? (
+                  <div className="space-y-1.5">
+                    {movieCredits.cast.map((a, idx) => (
+                      <div key={a.id} className={`flex items-center gap-2.5 p-2 rounded-xl border ${idx === 0 ? "bg-indigo-50 border-indigo-100" : "bg-slate-50 border-slate-100"}`}>
+                        <div className="w-9 h-9 rounded-lg bg-indigo-500 text-white flex items-center justify-center overflow-hidden shrink-0 text-[10px] font-bold font-mono">
+                          <TmdbAvatar name={a.name} initials={a.initials} />
+                        </div>
+                        <div className="truncate flex-1">
+                          <p className="text-xs font-bold text-slate-800 truncate">{a.name}</p>
+                          {a.character && <p className="text-[10px] text-slate-400 font-mono truncate">als {a.character}</p>}
+                        </div>
+                        {idx === 0 && <span className="text-[9px] font-bold text-indigo-600 bg-white border border-indigo-200 px-1.5 py-0.5 rounded-md shrink-0 uppercase tracking-wide">Lead</span>}
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-[11px] text-slate-400 italic">Geen cast gevonden.</p>
+                )}
+              </div>
+            </div>
+          )}
         </div>
       )}
 
