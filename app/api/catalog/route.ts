@@ -21,16 +21,42 @@ export async function GET(request: NextRequest) {
       database: process.env.DB_DATABASE || 'imdb_project',
     });
 
+    // Geselecteerde genres (OR-logica) — ook gebruikt voor het weergavelabel hieronder
+    const genres = searchParams.getAll('genre').filter(g => g && g !== 'all');
+
+    // Bepaal welk genre als label getoond wordt. Een titel heeft meerdere genres;
+    // standaard pakken we er willekeurig één. Maar als er genres geselecteerd zijn,
+    // tonen we het geselecteerde genre dat bij de titel hoort, zodat het label altijd
+    // overeenkomt met het actieve filter (bijv. "Mystery" i.p.v. "Action").
+    const selectParams: any[] = [];
+    let genreLabelExpr = `(
+      SELECT g.genre_name FROM genre g
+      JOIN title_genre tg ON g.genre_id = tg.genre_id
+      WHERE tg.title_id = t.title_id AND g.genre_name NOT IN ('Film-Noir', 'News')
+      LIMIT 1
+    )`;
+    if (genres.length > 0) {
+      const placeholders = genres.map(() => '?').join(',');
+      genreLabelExpr = `(
+        SELECT g.genre_name FROM genre g
+        JOIN title_genre tg ON g.genre_id = tg.genre_id
+        WHERE tg.title_id = t.title_id AND g.genre_name NOT IN ('Film-Noir', 'News')
+        ORDER BY (g.genre_name IN (${placeholders})) DESC, g.genre_name
+        LIMIT 1
+      )`;
+      selectParams.push(...genres);
+    }
+
     // 2. Bouw de basis-query (veilig tegen SQL-injecties met '?')
     let query = `
-      SELECT 
-        t.title_id AS id, 
-        t.primary_title AS title, 
-        (SELECT g.genre_name FROM genre g JOIN title_genre tg ON g.genre_id = tg.genre_id WHERE tg.title_id = t.title_id LIMIT 1) AS genre,
-        c.content_type_name AS type, 
-        t.start_year AS year, 
-        f.budget AS budget, 
-        t.is_adult AS isAdultClassification, 
+      SELECT
+        t.title_id AS id,
+        t.primary_title AS title,
+        ${genreLabelExpr} AS genre,
+        c.content_type_name AS type,
+        t.start_year AS year,
+        f.budget AS budget,
+        t.is_adult AS isAdultClassification,
         t.runtime_minutes AS durationMinutes,
         COALESCE(tr.average_rating / 10, 0.5) AS baseMarginFactor,
         tr.average_rating AS imdbRating
@@ -42,9 +68,10 @@ export async function GET(request: NextRequest) {
         AND f.budget >= ? AND f.budget <= ?
         AND t.runtime_minutes IS NOT NULL
     `;
-    
-    // Arrays met parameters voor de '?' plekken
-    const params: any[] = [startYear, endYear, minBudget, maxBudget];
+
+    // Arrays met parameters voor de '?' plekken.
+    // De label-subquery staat in de SELECT, dus die params komen vooraan.
+    const params: any[] = [...selectParams, startYear, endYear, minBudget, maxBudget];
 
     // 3. Voeg Type filter toe — ondersteunt meerdere types (OR-logica)
     const types = searchParams.getAll('type').filter(t => t && t !== 'all');
@@ -57,7 +84,6 @@ export async function GET(request: NextRequest) {
     }
 
     // 4. Voeg Genre filter toe — ondersteunt meerdere genres (OR-logica)
-    const genres = searchParams.getAll('genre').filter(g => g && g !== 'all');
     if (genres.length === 1) {
       query += ` AND EXISTS (
         SELECT 1 FROM title_genre tg2
