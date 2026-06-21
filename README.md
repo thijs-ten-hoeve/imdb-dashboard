@@ -1,23 +1,3 @@
-# Canary Dashboard — Prestatiepredictor
-
-Het Canary Dashboard is een interactief dashboard voor Canary Productions waarmee de
-verwachte prestaties van filmproducties kunnen worden ingeschat. Op basis van een IMDb-
-en TMDB-dataset filtert het dashboard op type media, genre, budget en tijdsperiode en
-toont het onder meer de verwachte winst per genre, de best scorende films, een geschikte
-regisseur en acteur, en per film de regie en hoofdcast.
-
-## Implementatieadvies
-
-Omdat Gerold het dashboard zelfstandig gebruikt, is het aan te raden het dashboard te
-plaatsen op een stabiele omgeving die altijd bereikbaar is, bijvoorbeeld via een
-cloudservice. Zo kan Gerold het dashboard op elk moment openen zonder afhankelijk te zijn
-van een lokale computer die aan moet staan.
-
-Het dashboard werkt het beste op een desktop of laptop in een moderne browser zoals Chrome
-of Edge. Voor dagelijks gebruik hoeft Gerold alleen de filters aan de linkerkant in te
-stellen: genre, budget en tijdsperiode. De rest van het dashboard past zich daar
-automatisch op aan. De meegeleverde video bevat een uitgebreidere uitleg.
-
 ## Lokale installatie en opstartinstructies
 
 Wanneer het dashboard lokaal moet worden uitgevoerd, kunnen de volgende stappen worden
